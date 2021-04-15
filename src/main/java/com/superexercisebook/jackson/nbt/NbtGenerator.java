@@ -17,11 +17,11 @@ import java.math.BigInteger;
 import java.util.Stack;
 
 public class NbtGenerator extends GeneratorBase {
-    private OutputStream writer;
+    private final OutputStream writer;
 
-    Tag<?> rootTag = null;
+    private Tag<?> rootTag = null;
 
-    Stack<Tag<?>> tagStack = new Stack<>();
+    private final Stack<Object> tagStack = new Stack<>();
 
     public NbtGenerator(IOContext ctxt, int stdFeat, ObjectCodec objectCodec, OutputStream out) {
         super(stdFeat, objectCodec);
@@ -74,7 +74,7 @@ public class NbtGenerator extends GeneratorBase {
     public void writeStartObject() throws IOException {
         _verifyValueWrite("start an object");
         CompoundTagWriter t = new CompoundTagWriter();
-        _writeHelper(t);
+        _writeHelper(t.tag);
         tagStack.push(t);
     }
 

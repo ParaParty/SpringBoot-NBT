@@ -3,8 +3,10 @@ package com.superexercisebook.jackson.nbt;
 import net.querz.nbt.tag.CompoundTag;
 import net.querz.nbt.tag.Tag;
 
-public class CompoundTagWriter extends CompoundTag {
+public class CompoundTagWriter {
     private String pendingFieldName = null;
+
+    public CompoundTag tag = new CompoundTag();
 
     public boolean addPendingFieldName(String name) {
         if (pendingFieldName == null) {
@@ -18,7 +20,7 @@ public class CompoundTagWriter extends CompoundTag {
         if (pendingFieldName == null) {
             return false;
         }
-        this.put(pendingFieldName, value);
+        tag.put(pendingFieldName, value);
         pendingFieldName = null;
         return true;
     }
