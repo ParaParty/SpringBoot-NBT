@@ -162,11 +162,8 @@ public class NbtFactory extends JsonFactory {
     @Override
     protected NbtParser _createParser(InputStream in, IOContext ctxt) throws IOException
     {
-        // TODO
-//        byte[] buf = ctxt.allocReadIOBuffer();
-//        return new NbtParser(ctxt, _parserFeatures,
-//                _objectCodec, in, buf, 0, 0, true);
-        return null;
+        byte[] buf = ctxt.allocReadIOBuffer();
+        return new NbtParser(ctxt, _parserFeatures, _objectCodec, in, buf, 0, 0, true);
     }
 
     @Override
@@ -183,10 +180,7 @@ public class NbtFactory extends JsonFactory {
     @Override
     protected NbtParser _createParser(byte[] data, int offset, int len, IOContext ctxt) throws IOException
     {
-        // TODO
-//        return new NbtParser(ctxt, _parserFeatures,
-//                _objectCodec, null, data, offset, len, false);
-        return null;
+        return new NbtParser(ctxt, _parserFeatures, _objectCodec, null, data, offset, len, false);
     }
 
     @Override
@@ -204,7 +198,7 @@ public class NbtFactory extends JsonFactory {
         return _nonByteTarget();
     }
 
-    private final NbtGenerator _createNbtGenerator(IOContext ctxt, int stdFeat, ObjectCodec codec, OutputStream out) throws IOException
+    private NbtGenerator _createNbtGenerator(IOContext ctxt, int stdFeat, ObjectCodec codec, OutputStream out) throws IOException
     {
         return new NbtGenerator(ctxt, stdFeat, _objectCodec, out);
     }

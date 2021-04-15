@@ -2,12 +2,45 @@ package com.superexercisebook.jackson.nbt;
 
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.base.ParserMinimalBase;
+import com.fasterxml.jackson.core.io.IOContext;
+import com.fasterxml.jackson.core.util.TextBuffer;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
 public class NbtParser extends ParserMinimalBase {
+    private final IOContext _ioContext;
+    private final ObjectCodec _objectCodec;
+    private final InputStream _inputStream;
+    private final byte[] _inputBuffer;
+    private final int _inputPtr;
+    private final int _inputEnd;
+    private final boolean _bufferRecyclable;
+    private final TextBuffer _textBuffer;
+    private final int _tokenInputRow;
+    private final int _tokenInputCol;
+
+    public NbtParser(IOContext ctxt, int parserFeatures,
+                     ObjectCodec codec,
+                     InputStream in, byte[] inputBuffer, int start, int end,
+                     boolean bufferRecyclable){
+        super(parserFeatures);
+        _ioContext = ctxt;
+        _objectCodec = codec;
+
+        _inputStream = in;
+        _inputBuffer = inputBuffer;
+        _inputPtr = start;
+        _inputEnd = end;
+        _bufferRecyclable = bufferRecyclable;
+        _textBuffer = ctxt.constructTextBuffer();
+
+        _tokenInputRow = -1;
+        _tokenInputCol = -1;
+    }
+
     @Override
     public JsonToken nextToken() throws IOException {
         return null;
