@@ -40,7 +40,7 @@ public class NbtGenerator extends GeneratorBase {
     @Override
     public void writeStartArray() throws IOException {
         _verifyValueWrite("start an array");
-        ListTag<?> t = new ListTag<>(Tag.class);
+        ListTag<?> t = ListTag.createUnchecked(EndTag.class);
         _writeHelper(t);
         tagStack.push(t);
     }
@@ -492,14 +492,10 @@ public class NbtGenerator extends GeneratorBase {
         if (isFlushed) return;
         isFlushed = true;
 
-        if (tagStack.size() > 1) {
+        if (!tagStack.empty()) {
             _reportError("Can not flush");
         }
-        else if (tagStack.size() == 1)
-        {
-            Tag<?> s = tagStack.peek();
-            new NBTSerializer(false).toStream(new NamedTag(null, s), writer);
-        } else if ( rootTag != null) {
+        else if ( rootTag != null) {
             new NBTSerializer(false).toStream(new NamedTag(null, rootTag), writer);
         }
     }

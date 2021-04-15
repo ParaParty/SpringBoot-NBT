@@ -17,8 +17,15 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    
+
     compile "org.jetbrains.kotlin:kotlin-reflect:1.4.32"
+
+    // define a BOM and its version
+    implementation(platform("com.squareup.okhttp3:okhttp-bom:4.9.0"))
+
+    // define any required OkHttp artifacts without version
+    implementation("com.squareup.okhttp3:okhttp")
+    implementation("com.squareup.okhttp3:logging-interceptor")
 
     compile 'com.github.Querz:NBT:6.1'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
