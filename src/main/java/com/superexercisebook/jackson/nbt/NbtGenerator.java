@@ -28,6 +28,10 @@ public class NbtGenerator extends GeneratorBase {
         this.writer = out;
     }
 
+    private boolean checkTagStackIsNonnullAndIsPeekSpecifyType(Class clazz) {
+        return tagStack.size() != 0 && (clazz.isInstance(tagStack.peek()));
+    }
+
     /**
      * Method for writing starting marker of a Array value
      * (for JSON this is character '['; plus possible white space decoration
@@ -55,7 +59,7 @@ public class NbtGenerator extends GeneratorBase {
      */
     @Override
     public void writeEndArray() throws IOException {
-        if (tagStack.size() == 0 || !(tagStack.peek() instanceof ListTag)) {
+        if (!checkTagStackIsNonnullAndIsPeekSpecifyType(ListTag.class)) {
             _reportError("Current context not Array but Object");
         }
         tagStack.pop();
@@ -90,7 +94,7 @@ public class NbtGenerator extends GeneratorBase {
      */
     @Override
     public void writeEndObject() throws IOException {
-        if (tagStack.size() == 0 || !(tagStack.peek() instanceof CompoundTagWriter)) {
+        if (!checkTagStackIsNonnullAndIsPeekSpecifyType(CompoundTagWriter.class)) {
             _reportError("Current context not Object but Array");
         }
         tagStack.pop();
@@ -109,14 +113,16 @@ public class NbtGenerator extends GeneratorBase {
      */
     @Override
     public void writeFieldName(String name) throws IOException {
-        if (tagStack.size() == 0 || !(tagStack.peek() instanceof CompoundTagWriter)) {
+        if (!checkTagStackIsNonnullAndIsPeekSpecifyType(CompoundTagWriter.class)) {
             _reportError("Key value pair not allow here.");
         }
 
         CompoundTagWriter s = (CompoundTagWriter) tagStack.peek();
-        if (!s.addPendingFieldName(name)) {
+        if (s.isPendingFieldNameNull()) {
+            s.addPendingFieldName(name);
+        } else {
             _reportError("Field name is already exists.");
-        };
+        }
     }
 
     /**
@@ -126,19 +132,19 @@ public class NbtGenerator extends GeneratorBase {
      * @throws IOException
      */
     private void _writeHelper(Tag<?> v) throws IOException {
-        if (tagStack.size() == 0) {
-            rootTag = v;
-        } else if (tagStack.peek() instanceof CompoundTagWriter) {
+        if (checkTagStackIsNonnullAndIsPeekSpecifyType(CompoundTagWriter.class)) {
             CompoundTagWriter s = (CompoundTagWriter) tagStack.peek();
-            if (!s.finishField(v)) {
+            if (s.isPendingFieldNameNull()) {
                 _reportError("No field name exists.");
-            };
-        }
-        else if (tagStack.peek() instanceof ListTag) {
+            } else {
+                s.finishField(v);
+            }
+        } else if (checkTagStackIsNonnullAndIsPeekSpecifyType(ListTag.class)) {
             ListTag<Tag<?>> s = (ListTag<Tag<?>>) tagStack.peek();
             s.add(v);
+        } else {
+            rootTag = v;
         }
-        else rootTag = v;
     }
 
     /**
@@ -472,17 +478,18 @@ public class NbtGenerator extends GeneratorBase {
      */
     @Override
     public void writeNull() throws IOException {
-        if (tagStack.peek() instanceof CompoundTagWriter) {
+        if (checkTagStackIsNonnullAndIsPeekSpecifyType(CompoundTagWriter.class)) {
             CompoundTagWriter s = (CompoundTagWriter) tagStack.peek();
-            if (!s.cleanFieldName()) {
+            if (s.isPendingFieldNameNull()) {
                 _reportError("No field name exists.");
-            };
+            } else {
+                s.cleanFieldName();
+            }
+        } else if (checkTagStackIsNonnullAndIsPeekSpecifyType(ListTag.class)) {
+            // todo
+        } else {
+            rootTag = null;
         }
-        else if (tagStack.peek() instanceof ListTag) {
-
-        }
-        else
-        rootTag = null;
     }
 
     private boolean isFlushed = false;
@@ -495,7 +502,7 @@ public class NbtGenerator extends GeneratorBase {
         if (!tagStack.empty()) {
             _reportError("Can not flush");
         }
-        else if ( rootTag != null) {
+        else if (rootTag != null) {
             new NBTSerializer(false).toStream(new NamedTag(null, rootTag), writer);
         }
     }

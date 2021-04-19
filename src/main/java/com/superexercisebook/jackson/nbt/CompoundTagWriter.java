@@ -8,28 +8,20 @@ public class CompoundTagWriter {
 
     public CompoundTag tag = new CompoundTag();
 
-    public boolean addPendingFieldName(String name) {
-        if (pendingFieldName == null) {
-            pendingFieldName = name;
-            return true;
-        }
-        return false;
+    public boolean isPendingFieldNameNull() {
+        return pendingFieldName == null;
     }
 
-    public boolean finishField(Tag<?> value) {
-        if (pendingFieldName == null) {
-            return false;
-        }
+    public void addPendingFieldName(String name) {
+        pendingFieldName = name;
+    }
+
+    public void finishField(Tag<?> value) {
         tag.put(pendingFieldName, value);
         pendingFieldName = null;
-        return true;
     }
 
-    public boolean cleanFieldName() {
-        if (pendingFieldName == null) {
-            return false;
-        }
+    public void cleanFieldName() {
         pendingFieldName = null;
-        return true;
     }
 }
