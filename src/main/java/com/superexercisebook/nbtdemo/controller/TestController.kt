@@ -6,10 +6,7 @@ import com.superexercisebook.nbtdemo.domain.dto.RegisterFormDto
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.springframework.stereotype.Controller
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.ResponseBody
+import org.springframework.web.bind.annotation.*
 import java.util.*
 
 
@@ -80,7 +77,7 @@ class TestController {
      */
     @PostMapping("/simple/register", produces = ["text/plain"])
     @ResponseBody
-    fun simpleRegister(t : RegisterFormDto): Any {
+    fun simpleRegister(@RequestBody t : RegisterFormDto): Any {
         return "${t.username}\n${t.email}"
     }
 
