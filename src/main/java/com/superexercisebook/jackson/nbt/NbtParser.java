@@ -10,25 +10,26 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Stack;
 
 public class NbtParser extends ParserMinimalBase {
-    private final IOContext _ioContext;
-    private ObjectCodec _objectCodec;
-    private final InputStream _inputStream;
-    private final byte[] _inputBuffer;
-    private final int _inputPtr;
-    private final int _inputEnd;
-    private final boolean _bufferRecyclable;
-    private final TextBuffer _textBuffer;
-    private final int _tokenInputRow;
-    private final int _tokenInputCol;
+    private final IOContext ioContext;
+    private final InputStream inputStream;
+    private final byte[] inputBuffer;
+    private final int inputStart;
+    private final int inputLength;
+    private final boolean bufferRecyclable;
+    private final TextBuffer textBuffer;
+    private final int tokenInputRow;
+    private final int tokenInputCol;
 
-    private JsonReadContext _parsingContext;
+    private int objectCounter;
+    private int inputPtr;
+    private ObjectCodec objectCodec;
+    private JsonReadContext parsingContext;
+    private boolean closed;
 
     /* nbt format tag */
     private enum NbtTag {
@@ -91,54 +92,30 @@ public class NbtParser extends ParserMinimalBase {
 
     public NbtParser(IOContext ctxt, int parserFeatures,
                      ObjectCodec codec,
-                     InputStream in, byte[] inputBuffer, int start, int end,
+                     InputStream in, byte[] inputBuffer, int start, int length,
                      boolean bufferRecyclable){
         super(parserFeatures);
-        _ioContext = ctxt;
-        _objectCodec = codec;
+        ioContext = ctxt;
+        objectCodec = codec;
 
-        _inputStream = in;
-        _inputBuffer = inputBuffer;
-        _inputPtr = start;
-        _inputEnd = end;
-        _bufferRecyclable = bufferRecyclable;
-        _textBuffer = ctxt.constructTextBuffer();
+        inputStream = in;
+        this.inputBuffer = inputBuffer;
+        inputPtr = start;
+        inputStart = start;
+        inputLength = length;
+        this.bufferRecyclable = bufferRecyclable;
+        textBuffer = ctxt.constructTextBuffer();
 
-        _tokenInputRow = -1;
-        _tokenInputCol = -1;
+        tokenInputRow = -1;
+        tokenInputCol = -1;
+
+        objectCounter = 0;
+        closed = false;
     }
 
-    private byte[] fakeInputBuffer;
-    private int ptr;
-    private int parserFlag;
-
-    public void setInput(byte[] inputBuffer) {
-        fakeInputBuffer = inputBuffer;
-        ptr = 0;
-        parserFlag = 0;
-    }
-
-    private int getUnsignedShort() {
-        int value = ((fakeInputBuffer[ptr] & 0xFF) << 8) | (fakeInputBuffer[ptr + 1] & 0xFF);
-        ptr += Short.BYTES;
-        return value;
-    }
-
-    private int getSignedInt() {
-        int value = ((fakeInputBuffer[ptr] & 0xFF) << 24)
-                | ((fakeInputBuffer[ptr + 1] & 0xFF) << 16)
-                | ((fakeInputBuffer[ptr + 2] & 0xFF) << 8)
-                | (fakeInputBuffer[ptr + 3] & 0xFF);
-        ptr += 4;
-        return value;
-    }
-
-    public int getNbtTypeId() {
-        return fakeInputBuffer[ptr++] & 0xFF;
-    }
-
-    public String getFieldName() {
-        return getStringValue();
+    @Override
+    public String getCurrentName() throws IOException {
+        return getText();
     }
 
     /**
@@ -154,11 +131,15 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public long getLongValue() throws IOException {
-        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
-        buffer.put(fakeInputBuffer, ptr, Long.BYTES);
-        ptr += Long.BYTES;
-        long value = buffer.getLong();
-        buffer.clear();
+        long value = ((long) (inputBuffer[inputPtr] & 0xFF) << 56)
+                | ((long) (inputBuffer[inputPtr + 1] & 0xFF) << 48)
+                | ((long) (inputBuffer[inputPtr + 2] & 0xFF) << 40)
+                | ((long) (inputBuffer[inputPtr + 3] & 0xFF) << 32)
+                | ((long) (inputBuffer[inputPtr + 4] & 0xFF) << 24)
+                | ((inputBuffer[inputPtr + 5] & 0xFF) << 16)
+                | ((inputBuffer[inputPtr + 6] & 0xFF) << 8)
+                | (inputBuffer[inputPtr + 7] & 0xFF);
+        inputPtr += 8;
         return value;
     }
 
@@ -167,27 +148,25 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public float getFloatValue() throws IOException {
-        int asFloat = ((fakeInputBuffer[ptr] & 0xFF) << 24)
-                | ((fakeInputBuffer[ptr + 1] & 0xFF) << 16)
-                | ((fakeInputBuffer[ptr + 2] & 0xFF) << 8)
-                | (fakeInputBuffer[ptr + 3] & 0xFF);
-        ptr += 4;
+        int asFloat = getSignedInt();
         return Float.intBitsToFloat(asFloat);
     }
 
     /**
      * @return A single signed byte
      */
+    @Override
     public byte getByteValue() {
-        return fakeInputBuffer[ptr++];
+        return inputBuffer[inputPtr++];
     }
 
     /**
      * @return A single signed, big endian 16 bit integer
      */
+    @Override
     public short getShortValue() {
-        short value = (short) (((fakeInputBuffer[ptr] & 0xFF) << 8) | (fakeInputBuffer[ptr + 1] & 0xFF));
-        ptr += 2;
+        short value = (short) (((inputBuffer[inputPtr] & 0xFF) << 8) | (inputBuffer[inputPtr + 1] & 0xFF));
+        inputPtr += 2;
         return value;
     }
 
@@ -196,15 +175,7 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public double getDoubleValue() throws IOException {
-        long asDouble = ((long) (fakeInputBuffer[ptr] & 0xFF) << 56)
-                | ((long) (fakeInputBuffer[ptr + 1] & 0xFF) << 48)
-                | ((long) (fakeInputBuffer[ptr + 2] & 0xFF) << 40)
-                | ((long) (fakeInputBuffer[ptr + 3] & 0xFF) << 32)
-                | ((long) (fakeInputBuffer[ptr + 4] & 0xFF) << 24)
-                | ((fakeInputBuffer[ptr + 5] & 0xFF) << 16)
-                | ((fakeInputBuffer[ptr + 6] & 0xFF) << 8)
-                | (fakeInputBuffer[ptr + 7] & 0xFF);
-        ptr += 8;
+        long asDouble = getLongValue();
         return Double.longBitsToDouble(asDouble);
     }
 
@@ -215,8 +186,8 @@ public class NbtParser extends ParserMinimalBase {
      */
     public byte[] getByteArrayValue() {
         int length = getSignedInt();
-        byte[] value = Arrays.copyOfRange(fakeInputBuffer, ptr, ptr + length);
-        ptr += length;
+        byte[] value = Arrays.copyOfRange(inputBuffer, inputPtr, inputPtr + length);
+        inputPtr += length;
         return value;
     }
 
@@ -226,12 +197,13 @@ public class NbtParser extends ParserMinimalBase {
      *
      * @return A length-prefixed modified UTF-8 string.
      */
-    public String getStringValue() {
+    @Override
+    public String getText() {
         StringBuilder value = new StringBuilder();
         int length = getUnsignedShort();
         for (int i = 0; i < length; i++) {
-            value.append((char) fakeInputBuffer[ptr]);
-            ptr++;
+            value.append((char) inputBuffer[inputPtr]);
+            inputPtr++;
         }
         return value.toString();
     }
@@ -298,7 +270,7 @@ public class NbtParser extends ParserMinimalBase {
             case TAG_STRING:
                 List<String> stringList = new ArrayList<>();
                 for (int i = 0; i < length; i++) {
-                    stringList.add(getStringValue());
+                    stringList.add(getText());
                 }
                 return stringList;
             case TAG_COMPOUND:
@@ -322,14 +294,6 @@ public class NbtParser extends ParserMinimalBase {
         }
     }
 
-    private boolean checkIsParserFinished() {
-        if (ptr >= fakeInputBuffer.length) {
-            // eof
-            return true;
-        }
-        return parserFlag == 0;
-    }
-
     /**
      * Effectively a list of a named tags. Order is not guaranteed.
      *
@@ -337,74 +301,10 @@ public class NbtParser extends ParserMinimalBase {
      */
     public Object getCompoundValue() throws IOException {
         int curTypeId = getNbtTypeId();
-        parserFlag++;
-        String curObjectName = getFieldName();
+        objectCounter++;
+        String curObjectName = getCurrentName();
         parseObjectBody();
         return new Object();
-    }
-
-    private void parseObjectBody() throws IOException {
-        while (!checkIsParserFinished()) {
-            NbtTag subLevelTag = NbtTag.getTagByTypeId(getNbtTypeId());
-            String curFieldName;
-            switch (subLevelTag) {
-                case TAG_BYTE:
-                    curFieldName = getFieldName();
-                    byte curByte = getByteValue();
-                    break;
-                case TAG_SHORT:
-                    curFieldName = getFieldName();
-                    short curShort = getShortValue();
-                    break;
-                case TAG_INT:
-                    curFieldName = getFieldName();
-                    int curInt = getIntValue();
-                    break;
-                case TAG_LONG:
-                    curFieldName = getFieldName();
-                    long curLong = getLongValue();
-                    break;
-                case TAG_FLOAT:
-                    curFieldName = getFieldName();
-                    float curFloat = getFloatValue();
-                    break;
-                case TAG_DOUBLE:
-                    curFieldName = getFieldName();
-                    double curDouble = getDoubleValue();
-                    break;
-                case TAG_BYTE_ARRAY:
-                    curFieldName = getFieldName();
-                    byte[] curByteArray = getByteArrayValue();
-                    break;
-                case TAG_STRING:
-                    curFieldName = getFieldName();
-                    String curString = getStringValue();
-                    break;
-                case TAG_LIST:
-                    curFieldName = getFieldName();
-                    List<?> curList = getListValue();
-                    break;
-                case TAG_COMPOUND:
-                    curFieldName = getFieldName();
-                    parserFlag++;
-                    parseObjectBody();  // head has been parsed
-                    break;
-                case TAG_INT_ARRAY:
-                    curFieldName = getFieldName();
-                    int[] curIntArray = getIntArrayValue();
-                    break;
-                case TAG_LONG_ARRAY:
-                    curFieldName = getFieldName();
-                    long[] curLongArray = getLongArrayValue();
-                    break;
-                case TAG_END:
-                    parserFlag--;
-                    break;
-                default:
-                    // todo, handle illegal input
-                    break;
-            }
-        }
     }
 
     /**
@@ -437,85 +337,57 @@ public class NbtParser extends ParserMinimalBase {
         return value;
     }
 
-    // *********************************
-
     @Override
     public JsonToken nextToken() throws IOException {
         return null;
     }
 
-    /**
-     * Method sub-classes need to implement
-     */
     @Override
     protected void _handleEOF() throws JsonParseException {
-
+        _throwInternal();
     }
 
-    @Override
-    public String getCurrentName() throws IOException {
-        return null;
-    }
-
-    /**
-     * Accessor for {@link ObjectCodec} associated with this
-     * parser, if any. Codec is used by {@link #readValueAs(Class)}
-     * method (and its variants).
-     */
     @Override
     public ObjectCodec getCodec() {
-        return _objectCodec;
+        return objectCodec;
     }
 
-    /**
-     * Setter that allows defining {@link ObjectCodec} associated with this
-     * parser, if any. Codec is used by {@link #readValueAs(Class)}
-     * method (and its variants).
-     *
-     * @param c
-     */
     @Override
     public void setCodec(ObjectCodec c) {
-        _objectCodec = c;
+        objectCodec = c;
     }
 
-    /**
-     * Accessor for getting version of the core package, given a parser instance.
-     * Left for sub-classes to implement.
-     */
     @Override
     public Version version() {
-        return null;
+        return objectCodec.version();
     }
 
     @Override
     public void close() throws IOException {
+        closed = true;
     }
 
     @Override
     public boolean isClosed() {
-        return false;
+        if (inputPtr >= inputStart + inputLength) {
+            // eof
+            closed = true;
+        } else {
+            closed = objectCounter == 0;
+        }
+        return closed;
     }
 
     @Override
     public JsonStreamContext getParsingContext() {
-        return _parsingContext;
+        return parsingContext;
     }
 
-    /**
-     * Method that return the <b>starting</b> location of the current
-     * token; that is, position of the first character from input
-     * that starts the current token.
-     */
     @Override
     public JsonLocation getTokenLocation() {
         return null;
     }
 
-    /**
-     * Method that returns location of the last processed character;
-     * usually for error reporting purposes.
-     */
     @Override
     public JsonLocation getCurrentLocation() {
         return null;
@@ -524,11 +396,6 @@ public class NbtParser extends ParserMinimalBase {
     @Override
     public void overrideCurrentName(String name) {
 
-    }
-
-    @Override
-    public String getText() throws IOException {
-        return null;
     }
 
     @Override
@@ -541,23 +408,11 @@ public class NbtParser extends ParserMinimalBase {
         return false;
     }
 
-    /**
-     * Generic number value accessor method that will work for
-     * all kinds of numeric values. It will return the optimal
-     * (simplest/smallest possible) wrapper object that can
-     * express the numeric value just parsed.
-     */
     @Override
     public Number getNumberValue() throws IOException {
         return null;
     }
 
-    /**
-     * If current token is of type
-     * {@link JsonToken#VALUE_NUMBER_INT} or
-     * {@link JsonToken#VALUE_NUMBER_FLOAT}, returns
-     * one of {@link NumberType} constants; otherwise returns null.
-     */
     @Override
     public NumberType getNumberType() throws IOException {
         return null;
@@ -586,5 +441,107 @@ public class NbtParser extends ParserMinimalBase {
     @Override
     public byte[] getBinaryValue(Base64Variant b64variant) throws IOException {
         return new byte[0];
+    }
+
+    /**
+     * used to read an unsigned short number, 2 bytes long
+     *
+     * @return a int converted by an unsigned short
+     */
+    private int getUnsignedShort() {
+        int value = ((inputBuffer[inputPtr] & 0xFF) << 8) | (inputBuffer[inputPtr + 1] & 0xFF);
+        inputPtr += 2;
+        return value;
+    }
+
+    /**
+     * used to read a signed int, 4 bytes long
+     *
+     * @return a 4 bytes long integer
+     */
+    private int getSignedInt() {
+        int value = ((inputBuffer[inputPtr] & 0xFF) << 24)
+                | ((inputBuffer[inputPtr + 1] & 0xFF) << 16)
+                | ((inputBuffer[inputPtr + 2] & 0xFF) << 8)
+                | (inputBuffer[inputPtr + 3] & 0xFF);
+        inputPtr += 4;
+        return value;
+    }
+
+    /**
+     * used to get the NBT type id, 1 byte long
+     *
+     * @return nbt type id {@link NbtTag#getNbtTypeId()}
+     */
+    private int getNbtTypeId() {
+        return inputBuffer[inputPtr++] & 0xFF;
+    }
+
+    /**
+     * object header include TAG_COMPOUND and field name with its length,
+     * the residue is object body
+     */
+    private void parseObjectBody() throws IOException {
+        while (!isClosed()) {
+            NbtTag subLevelTag = NbtTag.getTagByTypeId(getNbtTypeId());
+            String curFieldName;
+            switch (subLevelTag) {
+                case TAG_BYTE:
+                    curFieldName = getCurrentName();
+                    byte curByte = getByteValue();
+                    break;
+                case TAG_SHORT:
+                    curFieldName = getCurrentName();
+                    short curShort = getShortValue();
+                    break;
+                case TAG_INT:
+                    curFieldName = getCurrentName();
+                    int curInt = getIntValue();
+                    break;
+                case TAG_LONG:
+                    curFieldName = getCurrentName();
+                    long curLong = getLongValue();
+                    break;
+                case TAG_FLOAT:
+                    curFieldName = getCurrentName();
+                    float curFloat = getFloatValue();
+                    break;
+                case TAG_DOUBLE:
+                    curFieldName = getCurrentName();
+                    double curDouble = getDoubleValue();
+                    break;
+                case TAG_BYTE_ARRAY:
+                    curFieldName = getCurrentName();
+                    byte[] curByteArray = getByteArrayValue();
+                    break;
+                case TAG_STRING:
+                    curFieldName = getCurrentName();
+                    String curString = getText();
+                    break;
+                case TAG_LIST:
+                    curFieldName = getCurrentName();
+                    List<?> curList = getListValue();
+                    break;
+                case TAG_COMPOUND:
+                    curFieldName = getCurrentName();
+                    objectCounter++;
+                    parseObjectBody();  // head has been parsed
+                    break;
+                case TAG_INT_ARRAY:
+                    curFieldName = getCurrentName();
+                    int[] curIntArray = getIntArrayValue();
+                    break;
+                case TAG_LONG_ARRAY:
+                    curFieldName = getCurrentName();
+                    long[] curLongArray = getLongArrayValue();
+                    break;
+                case TAG_END:
+                    objectCounter--;
+                    break;
+                default:
+                    // todo, handle illegal input
+                    break;
+            }
+        }
     }
 }
