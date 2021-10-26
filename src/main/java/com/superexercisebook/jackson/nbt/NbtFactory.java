@@ -10,14 +10,14 @@ import java.io.*;
 import java.net.URL;
 
 public class NbtFactory extends JsonFactory {
-    public NbtFactory() { }
+    public NbtFactory() {
+    }
 
     public NbtFactory(ObjectCodec codec) {
         super(codec);
     }
 
-    protected NbtFactory(NbtFactory src, ObjectCodec oc)
-    {
+    protected NbtFactory(NbtFactory src, ObjectCodec oc) {
         super(src, oc);
     }
 
@@ -38,12 +38,10 @@ public class NbtFactory extends JsonFactory {
 
 
     @Override
-    public NbtFactory copy()
-    {
+    public NbtFactory copy() {
         _checkInvalidCopy(NbtFactory.class);
         return new NbtFactory(this, null);
     }
-
 
 
     @Override
@@ -61,8 +59,7 @@ public class NbtFactory extends JsonFactory {
         return "NBT";
     }
 
-    public MatchStrength hasFormat(InputAccessor acc) throws IOException
-    {
+    public MatchStrength hasFormat(InputAccessor acc) throws IOException {
         // TODO
         return MatchStrength.INCONCLUSIVE;
     }
@@ -81,8 +78,9 @@ public class NbtFactory extends JsonFactory {
     }
 
     @Override
-    public boolean canUseCharArrays() { return false; }
-
+    public boolean canUseCharArrays() {
+        return false;
+    }
 
 
     @SuppressWarnings("resource")
@@ -138,7 +136,7 @@ public class NbtFactory extends JsonFactory {
     /**
      * Method for constructing {@link JsonGenerator} for generating
      * Nbt-encoded output.
-     *<p>
+     * <p>
      * Since Nbt format always uses UTF-8 internally, no encoding need
      * to be passed to this method.
      */
@@ -160,10 +158,17 @@ public class NbtFactory extends JsonFactory {
     }
 
     @Override
-    protected NbtParser _createParser(InputStream in, IOContext ctxt) throws IOException
-    {
-        byte[] buf = ctxt.allocReadIOBuffer();
-        return new NbtParser(ctxt, _parserFeatures, _objectCodec, in, buf, 0, 0, true);
+    protected NbtParser _createParser(InputStream in, IOContext ctxt) throws IOException {
+        final int DEFAULT_BUFFER_SIZE = 8192;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int transferred = 0;
+        byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
+        int read;
+        while ((read = in.read(buffer, 0, DEFAULT_BUFFER_SIZE)) >= 0) {
+            out.write(buffer, 0, read);
+            transferred += read;
+        }
+        return _createParser(out.toByteArray(), 0, transferred, ctxt);
     }
 
     @Override
@@ -178,9 +183,8 @@ public class NbtFactory extends JsonFactory {
     }
 
     @Override
-    protected NbtParser _createParser(byte[] data, int offset, int len, IOContext ctxt) throws IOException
-    {
-        return new NbtParser(ctxt, _parserFeatures, _objectCodec, null, data, offset, len, false);
+    protected NbtParser _createParser(byte[] data, int offset, int len, IOContext ctxt) throws IOException {
+        return new NbtParser(ctxt, _parserFeatures, _objectCodec, data, offset, offset + len);
     }
 
     @Override
@@ -198,8 +202,7 @@ public class NbtFactory extends JsonFactory {
         return _nonByteTarget();
     }
 
-    private NbtGenerator _createNbtGenerator(IOContext ctxt, int stdFeat, ObjectCodec codec, OutputStream out) throws IOException
-    {
+    private NbtGenerator _createNbtGenerator(IOContext ctxt, int stdFeat, ObjectCodec codec, OutputStream out) throws IOException {
         return new NbtGenerator(ctxt, stdFeat, _objectCodec, out);
     }
 

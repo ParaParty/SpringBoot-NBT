@@ -3,46 +3,178 @@ package com.superexercisebook.jackson.nbt;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.base.ParserMinimalBase;
 import com.fasterxml.jackson.core.io.IOContext;
+import com.fasterxml.jackson.core.util.ByteArrayBuilder;
 import com.fasterxml.jackson.core.util.TextBuffer;
+import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
+import net.querz.nbt.tag.*;
 
+import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayDeque;
+import java.util.Stack;
 
 public class NbtParser extends ParserMinimalBase {
     private final IOContext _ioContext;
-    private final ObjectCodec _objectCodec;
-    private final InputStream _inputStream;
-    private final byte[] _inputBuffer;
-    private final int _inputPtr;
-    private final int _inputEnd;
-    private final boolean _bufferRecyclable;
+    private ObjectCodec _objectCodec;
     private final TextBuffer _textBuffer;
-    private final int _tokenInputRow;
-    private final int _tokenInputCol;
+
+    private final ByteInputStream inputStream;
+    private final DataInputStream dataInputStream;
+
+    private ArrayDeque<JsonToken> tokenQueue = new ArrayDeque<JsonToken>();
+    private ArrayDeque<Object> valueQueue = new ArrayDeque<Object>();
+    private Object nowValue = null;
+
+    private Stack<State> stateStack = new Stack<State>();
+
+    enum State {
+        MAP, LIST, LIST_BYTE, LIST_INT, LIST_ARRAY
+    }
+
+    private void pushState(State t) {
+        stateStack.push(t);
+    }
+
+    private void popState() {
+        stateStack.pop();
+    }
+
+    private State topState() {
+        return stateStack.peek();
+    }
 
     public NbtParser(IOContext ctxt, int parserFeatures,
                      ObjectCodec codec,
-                     InputStream in, byte[] inputBuffer, int start, int end,
-                     boolean bufferRecyclable){
+                     byte[] inputBuffer, int start, int end) throws IOException {
         super(parserFeatures);
         _ioContext = ctxt;
         _objectCodec = codec;
-
-        _inputStream = in;
-        _inputBuffer = inputBuffer;
-        _inputPtr = start;
-        _inputEnd = end;
-        _bufferRecyclable = bufferRecyclable;
         _textBuffer = ctxt.constructTextBuffer();
 
-        _tokenInputRow = -1;
-        _tokenInputCol = -1;
+        // include start, exclude end
+        inputStream = new ByteInputStream(inputBuffer, start, end - start);
+        dataInputStream = new DataInputStream(inputStream);
+
+        if (inputBuffer[0] == CompoundTag.ID) {
+            dataInputStream.readByte(); // 读掉 0x0A
+            dataInputStream.readUTF();  // 读掉第一层键-
+
+            tokenQueue.push(JsonToken.START_OBJECT);
+            pushState(State.MAP);
+        } else if (inputBuffer[0] == ListTag.ID) {
+            dataInputStream.readByte();
+            int length = dataInputStream.readInt();
+
+//            tokenQueue.push(JsonToken.START_ARRAY);
+//            pushState(State.LIST);
+        } else if (inputBuffer[0] == ByteArrayTag.ID) {
+            dataInputStream.readByte();
+            int length = dataInputStream.readInt();
+
+            for (int i = 0; i < length; i++) {
+                tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
+                valueQueue.add(dataInputStream.readByte());
+            }
+
+//            tokenQueue.push(JsonToken.START_ARRAY);
+//            pushState(State.LIST_BYTE);
+        } else if (inputBuffer[0] == IntArrayTag.ID) {
+            dataInputStream.readByte();
+            int length = dataInputStream.readInt();
+
+            for (int i = 0; i < length; i++) {
+                tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
+                valueQueue.add(dataInputStream.readInt());
+            }
+
+//            tokenQueue.push(JsonToken.START_ARRAY);
+//            pushState(State.LIST_INT);
+        } else if (inputBuffer[0] == LongArrayTag.ID) {
+            dataInputStream.readByte();
+            int length = dataInputStream.readInt();
+
+            for (int i = 0; i < length; i++) {
+                tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
+                valueQueue.add(dataInputStream.readLong());
+            }
+
+//            tokenQueue.push(JsonToken.START_ARRAY);
+//            pushState(State.LIST_ARRAY);
+        } else {
+            throw new IOException("Not support.");
+        }
     }
 
     @Override
     public JsonToken nextToken() throws IOException {
+        if (!tokenQueue.isEmpty()) {
+            nowValue = valueQueue.pop();
+            return tokenQueue.pop();
+        }
+
+        if (topState() == State.MAP) {
+            byte type = dataInputStream.readByte();
+            if (type == EndTag.ID) {
+                return null;
+            }
+
+            String key = dataInputStream.readUTF();
+            tokenQueue.push(JsonToken.FIELD_NAME);
+            valueQueue.push(key);
+
+            switch (type) {
+                case ByteTag.ID:
+                    tokenQueue.push(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.push(dataInputStream.readByte());
+                    break;
+                case ShortTag.ID:
+                    tokenQueue.push(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.push(dataInputStream.readShort());
+                    break;
+                case IntTag.ID:
+                    tokenQueue.push(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.push(dataInputStream.readInt());
+                    break;
+                case LongTag.ID:
+                    tokenQueue.push(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.push(dataInputStream.readLong());
+                    break;
+                case FloatTag.ID:
+                    tokenQueue.push(JsonToken.VALUE_NUMBER_FLOAT);
+                    valueQueue.push(dataInputStream.readFloat());
+                    break;
+                case DoubleTag.ID:
+                    tokenQueue.push(JsonToken.VALUE_NUMBER_FLOAT);
+                    valueQueue.push(dataInputStream.readDouble());
+                    break;
+                case ByteArrayTag.ID:
+                    //TODO
+                    break;
+                case StringTag.ID:
+                    tokenQueue.push(JsonToken.VALUE_STRING);
+                    valueQueue.push(dataInputStream.readUTF());
+                    break;
+                case ListTag.ID:
+                    //TODO
+                    break;
+                case CompoundTag.ID:
+                    pushState(State.MAP);
+                    break;
+                case IntArrayTag.ID:
+                    //TODO
+                    break;
+                case LongArrayTag.ID:
+                    //TODO
+                    break;
+            }
+        }
+
+        if (!tokenQueue.isEmpty()) {
+            nowValue = valueQueue.pop();
+            return tokenQueue.pop();
+        }
         return null;
     }
 
@@ -56,7 +188,10 @@ public class NbtParser extends ParserMinimalBase {
 
     @Override
     public String getCurrentName() throws IOException {
-        return null;
+        if (nowValue instanceof String) {
+            return (String) nowValue;
+        }
+        throw new IOException("");
     }
 
     /**
@@ -66,7 +201,7 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public ObjectCodec getCodec() {
-        return null;
+        return _objectCodec;
     }
 
     /**
@@ -78,7 +213,7 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public void setCodec(ObjectCodec c) {
-
+        _objectCodec = c;
     }
 
     /**
@@ -87,7 +222,7 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public Version version() {
-        return null;
+        return new Version(1, 0, 0, "", "", "");
     }
 
     @Override
@@ -131,17 +266,23 @@ public class NbtParser extends ParserMinimalBase {
 
     @Override
     public String getText() throws IOException {
-        return null;
+        if (nowValue instanceof String) {
+            return (String) nowValue;
+        }
+        throw new IOException("");
     }
 
     @Override
     public char[] getTextCharacters() throws IOException {
-        return new char[0];
+        if (nowValue instanceof String) {
+            return ((String) nowValue).toCharArray();
+        }
+        throw new IOException("");
     }
 
     @Override
     public boolean hasTextCharacters() {
-        return false;
+        return nowValue instanceof String;
     }
 
     /**
@@ -152,7 +293,10 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public Number getNumberValue() throws IOException {
-        return null;
+        if (nowValue instanceof Number) {
+            return (Number) nowValue;
+        }
+        throw new IOException("");
     }
 
     /**
@@ -163,6 +307,21 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public NumberType getNumberType() throws IOException {
+        if (nowValue instanceof Double) {
+            return NumberType.DOUBLE;
+        }
+        if (nowValue instanceof Float) {
+            return NumberType.FLOAT;
+        }
+
+        if (nowValue instanceof Byte || nowValue instanceof Short || nowValue instanceof Integer) {
+            return NumberType.INT;
+        }
+
+        if (nowValue instanceof Long) {
+            return NumberType.LONG;
+        }
+
         return null;
     }
 
@@ -181,7 +340,10 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public int getIntValue() throws IOException {
-        return 0;
+        if (nowValue instanceof Byte || nowValue instanceof Short || nowValue instanceof Integer) {
+            return ((Number) nowValue).intValue();
+        }
+        throw new IOException("");
     }
 
     /**
@@ -199,7 +361,10 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public long getLongValue() throws IOException {
-        return 0;
+        if (nowValue instanceof Byte || nowValue instanceof Short || nowValue instanceof Integer || nowValue instanceof Long) {
+            return ((Number) nowValue).longValue();
+        }
+        throw new IOException("");
     }
 
     /**
@@ -213,7 +378,10 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public BigInteger getBigIntegerValue() throws IOException {
-        return null;
+        if (nowValue instanceof Number) {
+            return new BigInteger(String.valueOf((Number) nowValue));
+        }
+        throw new IOException("");
     }
 
     /**
@@ -231,7 +399,10 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public float getFloatValue() throws IOException {
-        return 0;
+        if (nowValue instanceof Float) {
+            return (Float) nowValue;
+        }
+        throw new IOException("");
     }
 
     /**
@@ -249,7 +420,10 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public double getDoubleValue() throws IOException {
-        return 0;
+        if (nowValue instanceof Double) {
+            return (Double) nowValue;
+        }
+        throw new IOException("");
     }
 
     /**
@@ -260,12 +434,18 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public BigDecimal getDecimalValue() throws IOException {
-        return null;
+        if (nowValue instanceof Number) {
+            return new BigDecimal(String.valueOf((Number) nowValue));
+        }
+        throw new IOException("");
     }
 
     @Override
     public int getTextLength() throws IOException {
-        return 0;
+        if (nowValue instanceof String) {
+            return ((String) nowValue).length();
+        }
+        throw new IOException("");
     }
 
     @Override
@@ -274,7 +454,12 @@ public class NbtParser extends ParserMinimalBase {
     }
 
     @Override
-    public byte[] getBinaryValue(Base64Variant b64variant) throws IOException {
-        return new byte[0];
+    public byte[] getBinaryValue(Base64Variant variant) throws IOException {
+        if (!(nowValue instanceof String)) {
+            _reportError("Current token (" + _currToken + ") not VALUE_STRING, can not access as binary");
+        }
+        ByteArrayBuilder builder = new ByteArrayBuilder();
+        _decodeBase64(getText(), builder, variant);
+        return builder.toByteArray();
     }
 }
