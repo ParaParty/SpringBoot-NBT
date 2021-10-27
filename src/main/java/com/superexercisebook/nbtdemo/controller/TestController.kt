@@ -7,6 +7,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.springframework.stereotype.Controller
 import org.springframework.web.bind.annotation.*
+import java.io.ByteArrayInputStream
 import java.util.*
 
 
@@ -94,18 +95,12 @@ class TestController {
     /**
      * 反序列化测试
      */
-    @GetMapping("/simple/testParse", produces = ["application/json"])
+    @PostMapping("/simple/testParse", produces = ["application/json"])
     @ResponseBody
-    fun simpleParse(t : RegisterFormDto): Any {
-        // 随便从一个地方读取一个 Nbt 格式的文件
-        val request: Request = Request.Builder().url("http://127.0.0.1/objTest").build();
-        val result = client.newCall(request).execute().use {
-                response -> response.body()?.byteStream()
-        }
-
+    fun simpleParse(@RequestBody t : ByteArray): Any {
         // 以 json 形式输出到页面上
         val mapper = NbtMapper()
-        return mapper.readTree(result);
+        return mapper.readTree(ByteArrayInputStream(t));
     }
 
 }

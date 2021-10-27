@@ -34,6 +34,7 @@ public class NbtParser extends ParserMinimalBase {
     static class State {
         final byte type;
         final int length;
+        int nowIndex = 0;
         final byte containsType;
 
         State(byte type) {
@@ -175,6 +176,10 @@ public class NbtParser extends ParserMinimalBase {
             return _currToken = tokenQueue.removeFirst();
         }
 
+        if (!hasState()) {
+            throw new EOFException();
+        }
+
         if (topState().type == CompoundTag.ID) {
             byte type = dataInputStream.readByte();
             if (type == EndTag.ID) {
@@ -214,10 +219,14 @@ public class NbtParser extends ParserMinimalBase {
                         break;
                     case ByteArrayTag.ID: {
                         int length = dataInputStream.readInt();
+                        tokenQueue.add(JsonToken.START_ARRAY);
+                        valueQueue.add("[");
                         for (int i = 0; i < length; i++) {
                             tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
                             valueQueue.add(dataInputStream.readByte());
                         }
+                        tokenQueue.add(JsonToken.END_ARRAY);
+                        valueQueue.add("]");
                     }
                     break;
                     case StringTag.ID:
@@ -237,18 +246,26 @@ public class NbtParser extends ParserMinimalBase {
                         break;
                     case IntArrayTag.ID: {
                         int length = dataInputStream.readInt();
+                        tokenQueue.add(JsonToken.START_ARRAY);
+                        valueQueue.add("[");
                         for (int i = 0; i < length; i++) {
                             tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
                             valueQueue.add(dataInputStream.readInt());
                         }
+                        tokenQueue.add(JsonToken.END_ARRAY);
+                        valueQueue.add("]");
                     }
                     break;
                     case LongArrayTag.ID: {
                         int length = dataInputStream.readInt();
+                        tokenQueue.add(JsonToken.START_ARRAY);
+                        valueQueue.add("[");
                         for (int i = 0; i < length; i++) {
                             tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
                             valueQueue.add(dataInputStream.readLong());
                         }
+                        tokenQueue.add(JsonToken.END_ARRAY);
+                        valueQueue.add("]");
                     }
                     break;
                     default:
@@ -256,8 +273,9 @@ public class NbtParser extends ParserMinimalBase {
                 }
             }
         } else if (topState().type == ListTag.ID) {
-            byte nowContainsType = topState().containsType;
-            int nowLength = topState().length;
+            State nowState = topState();
+            byte nowContainsType = nowState.containsType;
+            int nowLength = nowState.length;
 
             switch (nowContainsType) {
                 case ByteTag.ID:
@@ -267,6 +285,7 @@ public class NbtParser extends ParserMinimalBase {
                     }
                     tokenQueue.addLast(JsonToken.END_ARRAY);
                     valueQueue.addLast("]");
+                    popState();
                     break;
                 case ShortTag.ID:
                     for (int i = 0; i < nowLength; i++) {
@@ -275,6 +294,7 @@ public class NbtParser extends ParserMinimalBase {
                     }
                     tokenQueue.addLast(JsonToken.END_ARRAY);
                     valueQueue.addLast("]");
+                    popState();
                     break;
                 case IntTag.ID:
                     for (int i = 0; i < nowLength; i++) {
@@ -283,6 +303,7 @@ public class NbtParser extends ParserMinimalBase {
                     }
                     tokenQueue.addLast(JsonToken.END_ARRAY);
                     valueQueue.addLast("]");
+                    popState();
                     break;
                 case LongTag.ID:
                     for (int i = 0; i < nowLength; i++) {
@@ -291,6 +312,7 @@ public class NbtParser extends ParserMinimalBase {
                     }
                     tokenQueue.addLast(JsonToken.END_ARRAY);
                     valueQueue.addLast("]");
+                    popState();
                     break;
                 case FloatTag.ID:
                     for (int i = 0; i < nowLength; i++) {
@@ -299,6 +321,7 @@ public class NbtParser extends ParserMinimalBase {
                     }
                     tokenQueue.addLast(JsonToken.END_ARRAY);
                     valueQueue.addLast("]");
+                    popState();
                     break;
                 case DoubleTag.ID:
                     for (int i = 0; i < nowLength; i++) {
@@ -307,9 +330,26 @@ public class NbtParser extends ParserMinimalBase {
                     }
                     tokenQueue.addLast(JsonToken.END_ARRAY);
                     valueQueue.addLast("]");
+                    popState();
                     break;
                 case ByteArrayTag.ID: {
-                    // TODO
+                    if (nowState.nowIndex < nowState.length) {
+                        nowState.nowIndex++;
+
+                        int length = dataInputStream.readInt();
+                        tokenQueue.add(JsonToken.START_ARRAY);
+                        valueQueue.add("[");
+                        for (int i = 0; i < length; i++) {
+                            tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
+                            valueQueue.add(dataInputStream.readByte());
+                        }
+                        tokenQueue.add(JsonToken.END_ARRAY);
+                        valueQueue.add("]");
+                    } else {
+                        tokenQueue.addLast(JsonToken.END_ARRAY);
+                        valueQueue.addLast("]");
+                        popState();
+                    }
                 }
                 break;
                 case StringTag.ID:
@@ -319,20 +359,74 @@ public class NbtParser extends ParserMinimalBase {
                     }
                     tokenQueue.addLast(JsonToken.END_ARRAY);
                     valueQueue.addLast("]");
+                    popState();
                     break;
                 case ListTag.ID: {
-                    // TODO
+                    if (nowState.nowIndex < nowState.length) {
+                        nowState.nowIndex++;
+
+                        byte containsType = dataInputStream.readByte();
+                        int length = dataInputStream.readInt();
+                        tokenQueue.addLast(JsonToken.START_ARRAY);
+                        valueQueue.addLast("[");
+                        pushState(State.LIST(length, containsType));
+                    } else {
+                        tokenQueue.addLast(JsonToken.END_ARRAY);
+                        valueQueue.addLast("]");
+                        popState();
+                    }
                 }
                 case CompoundTag.ID:
-                    // TODO
-                    pushState(State.MAP());
+                    if (nowState.nowIndex < nowState.length) {
+                        nowState.nowIndex++;
+
+                        tokenQueue.addLast(JsonToken.START_OBJECT);
+                        valueQueue.addLast("{");
+                        pushState(State.MAP());
+                    } else {
+                        tokenQueue.addLast(JsonToken.END_ARRAY);
+                        valueQueue.addLast("]");
+                        popState();
+                    }
                     break;
                 case IntArrayTag.ID: {
-                    // TODO
+                    if (nowState.nowIndex < nowState.length) {
+                        nowState.nowIndex++;
+
+                        int length = dataInputStream.readInt();
+                        tokenQueue.add(JsonToken.START_ARRAY);
+                        valueQueue.add("[");
+                        for (int i = 0; i < length; i++) {
+                            tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
+                            valueQueue.add(dataInputStream.readInt());
+                        }
+                        tokenQueue.add(JsonToken.END_ARRAY);
+                        valueQueue.add("]");
+                    } else {
+                        tokenQueue.addLast(JsonToken.END_ARRAY);
+                        valueQueue.addLast("]");
+                        popState();
+                    }
                 }
                 break;
                 case LongArrayTag.ID: {
-                    // TODO
+                    if (nowState.nowIndex < nowState.length) {
+                        nowState.nowIndex++;
+
+                        int length = dataInputStream.readInt();
+                        tokenQueue.add(JsonToken.START_ARRAY);
+                        valueQueue.add("[");
+                        for (int i = 0; i < length; i++) {
+                            tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
+                            valueQueue.add(dataInputStream.readLong());
+                        }
+                        tokenQueue.add(JsonToken.END_ARRAY);
+                        valueQueue.add("]");
+                    } else {
+                        tokenQueue.addLast(JsonToken.END_ARRAY);
+                        valueQueue.addLast("]");
+                        popState();
+                    }
                 }
                 break;
                 default:
