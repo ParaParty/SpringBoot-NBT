@@ -229,6 +229,7 @@ public class NbtParser extends ParserMinimalBase {
                         int length = dataInputStream.readInt();
                         tokenQueue.addLast(JsonToken.START_ARRAY);
                         valueQueue.addLast("[");
+                        pushState(State.LIST(length, containsType));
                         break;
                     }
                     case CompoundTag.ID:
@@ -250,10 +251,94 @@ public class NbtParser extends ParserMinimalBase {
                         }
                     }
                     break;
+                    default:
+                        _reportError("Invalid Type ID");
                 }
             }
         } else if (topState().type == ListTag.ID) {
-            // TODO
+            byte nowContainsType = topState().containsType;
+            int nowLength = topState().length;
+
+            switch (nowContainsType) {
+                case ByteTag.ID:
+                    for (int i = 0; i < nowLength; i++) {
+                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                        valueQueue.addLast(dataInputStream.readByte());
+                    }
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    break;
+                case ShortTag.ID:
+                    for (int i = 0; i < nowLength; i++) {
+                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                        valueQueue.addLast(dataInputStream.readShort());
+                    }
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    break;
+                case IntTag.ID:
+                    for (int i = 0; i < nowLength; i++) {
+                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                        valueQueue.addLast(dataInputStream.readInt());
+                    }
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    break;
+                case LongTag.ID:
+                    for (int i = 0; i < nowLength; i++) {
+                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                        valueQueue.addLast(dataInputStream.readLong());
+                    }
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    break;
+                case FloatTag.ID:
+                    for (int i = 0; i < nowLength; i++) {
+                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_FLOAT);
+                        valueQueue.addLast(dataInputStream.readFloat());
+                    }
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    break;
+                case DoubleTag.ID:
+                    for (int i = 0; i < nowLength; i++) {
+                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_FLOAT);
+                        valueQueue.addLast(dataInputStream.readDouble());
+                    }
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    break;
+                case ByteArrayTag.ID: {
+                    // TODO
+                }
+                break;
+                case StringTag.ID:
+                    for (int i = 0; i < nowLength; i++) {
+                        tokenQueue.addLast(JsonToken.VALUE_STRING);
+                        valueQueue.addLast(dataInputStream.readUTF());
+                    }
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    break;
+                case ListTag.ID: {
+                    // TODO
+                }
+                case CompoundTag.ID:
+                    // TODO
+                    pushState(State.MAP());
+                    break;
+                case IntArrayTag.ID: {
+                    // TODO
+                }
+                break;
+                case LongArrayTag.ID: {
+                    // TODO
+                }
+                break;
+                default:
+                    _reportError("Invalid Type ID");
+            }
+
         }
 
         if (!tokenQueue.isEmpty()) {
