@@ -278,6 +278,11 @@ public class NbtParser extends ParserMinimalBase {
             int nowLength = nowState.length;
 
             switch (nowContainsType) {
+                case EndTag.ID:
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    popState();
+                    break;
                 case ByteTag.ID:
                     for (int i = 0; i < nowLength; i++) {
                         tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
