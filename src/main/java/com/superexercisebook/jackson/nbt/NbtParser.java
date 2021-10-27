@@ -5,9 +5,9 @@ import com.fasterxml.jackson.core.base.ParserMinimalBase;
 import com.fasterxml.jackson.core.io.IOContext;
 import com.fasterxml.jackson.core.util.ByteArrayBuilder;
 import com.fasterxml.jackson.core.util.TextBuffer;
-import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
 import net.querz.nbt.tag.*;
 
+import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -20,8 +20,9 @@ public class NbtParser extends ParserMinimalBase {
     private ObjectCodec _objectCodec;
     private final TextBuffer _textBuffer;
 
-    private final ByteInputStream inputStream;
+    private final ByteArrayInputStream inputStream;
     private final DataInputStream dataInputStream;
+    private final int _totalByte;
 
     private ArrayDeque<JsonToken> tokenQueue = new ArrayDeque<JsonToken>();
     private ArrayDeque<Object> valueQueue = new ArrayDeque<Object>();
@@ -45,6 +46,10 @@ public class NbtParser extends ParserMinimalBase {
         return stateStack.peek();
     }
 
+    private boolean hasState() {
+        return !stateStack.isEmpty();
+    }
+
     public NbtParser(IOContext ctxt, int parserFeatures,
                      ObjectCodec codec,
                      byte[] inputBuffer, int start, int end) throws IOException {
@@ -54,20 +59,25 @@ public class NbtParser extends ParserMinimalBase {
         _textBuffer = ctxt.constructTextBuffer();
 
         // include start, exclude end
-        inputStream = new ByteInputStream(inputBuffer, start, end - start);
+        inputStream = new ByteArrayInputStream(inputBuffer, start, end - start);
         dataInputStream = new DataInputStream(inputStream);
+        _totalByte = end - start;
+
+
 
         if (inputBuffer[0] == CompoundTag.ID) {
             dataInputStream.readByte(); // 读掉 0x0A
-            dataInputStream.readUTF();  // 读掉第一层键-
+            String key = dataInputStream.readUTF();  // 读掉第一层键-
 
-            tokenQueue.push(JsonToken.START_OBJECT);
+            tokenQueue.addLast(JsonToken.START_OBJECT);
+            valueQueue.addLast(key);
             pushState(State.MAP);
         } else if (inputBuffer[0] == ListTag.ID) {
             dataInputStream.readByte();
             int length = dataInputStream.readInt();
+            // TODO
 
-//            tokenQueue.push(JsonToken.START_ARRAY);
+//            tokenQueue.addLast(JsonToken.START_ARRAY);
 //            pushState(State.LIST);
         } else if (inputBuffer[0] == ByteArrayTag.ID) {
             dataInputStream.readByte();
@@ -78,7 +88,7 @@ public class NbtParser extends ParserMinimalBase {
                 valueQueue.add(dataInputStream.readByte());
             }
 
-//            tokenQueue.push(JsonToken.START_ARRAY);
+//            tokenQueue.addLast(JsonToken.START_ARRAY);
 //            pushState(State.LIST_BYTE);
         } else if (inputBuffer[0] == IntArrayTag.ID) {
             dataInputStream.readByte();
@@ -89,7 +99,7 @@ public class NbtParser extends ParserMinimalBase {
                 valueQueue.add(dataInputStream.readInt());
             }
 
-//            tokenQueue.push(JsonToken.START_ARRAY);
+//            tokenQueue.addLast(JsonToken.START_ARRAY);
 //            pushState(State.LIST_INT);
         } else if (inputBuffer[0] == LongArrayTag.ID) {
             dataInputStream.readByte();
@@ -100,7 +110,7 @@ public class NbtParser extends ParserMinimalBase {
                 valueQueue.add(dataInputStream.readLong());
             }
 
-//            tokenQueue.push(JsonToken.START_ARRAY);
+//            tokenQueue.addLast(JsonToken.START_ARRAY);
 //            pushState(State.LIST_ARRAY);
         } else {
             throw new IOException("Not support.");
@@ -110,51 +120,55 @@ public class NbtParser extends ParserMinimalBase {
     @Override
     public JsonToken nextToken() throws IOException {
         if (!tokenQueue.isEmpty()) {
-            nowValue = valueQueue.pop();
-            return tokenQueue.pop();
+            nowValue = valueQueue.removeFirst();
+            return _currToken = tokenQueue.removeFirst();
         }
 
         if (topState() == State.MAP) {
             byte type = dataInputStream.readByte();
             if (type == EndTag.ID) {
+                popState();
+                if (hasState()) {
+                    return nextToken();
+                }
                 return null;
             }
 
             String key = dataInputStream.readUTF();
-            tokenQueue.push(JsonToken.FIELD_NAME);
-            valueQueue.push(key);
+            tokenQueue.addLast(JsonToken.FIELD_NAME);
+            valueQueue.addLast(key);
 
             switch (type) {
                 case ByteTag.ID:
-                    tokenQueue.push(JsonToken.VALUE_NUMBER_INT);
-                    valueQueue.push(dataInputStream.readByte());
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.addLast(dataInputStream.readByte());
                     break;
                 case ShortTag.ID:
-                    tokenQueue.push(JsonToken.VALUE_NUMBER_INT);
-                    valueQueue.push(dataInputStream.readShort());
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.addLast(dataInputStream.readShort());
                     break;
                 case IntTag.ID:
-                    tokenQueue.push(JsonToken.VALUE_NUMBER_INT);
-                    valueQueue.push(dataInputStream.readInt());
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.addLast(dataInputStream.readInt());
                     break;
                 case LongTag.ID:
-                    tokenQueue.push(JsonToken.VALUE_NUMBER_INT);
-                    valueQueue.push(dataInputStream.readLong());
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.addLast(dataInputStream.readLong());
                     break;
                 case FloatTag.ID:
-                    tokenQueue.push(JsonToken.VALUE_NUMBER_FLOAT);
-                    valueQueue.push(dataInputStream.readFloat());
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_FLOAT);
+                    valueQueue.addLast(dataInputStream.readFloat());
                     break;
                 case DoubleTag.ID:
-                    tokenQueue.push(JsonToken.VALUE_NUMBER_FLOAT);
-                    valueQueue.push(dataInputStream.readDouble());
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_FLOAT);
+                    valueQueue.addLast(dataInputStream.readDouble());
                     break;
                 case ByteArrayTag.ID:
                     //TODO
                     break;
                 case StringTag.ID:
-                    tokenQueue.push(JsonToken.VALUE_STRING);
-                    valueQueue.push(dataInputStream.readUTF());
+                    tokenQueue.addLast(JsonToken.VALUE_STRING);
+                    valueQueue.addLast(dataInputStream.readUTF());
                     break;
                 case ListTag.ID:
                     //TODO
@@ -172,8 +186,8 @@ public class NbtParser extends ParserMinimalBase {
         }
 
         if (!tokenQueue.isEmpty()) {
-            nowValue = valueQueue.pop();
-            return tokenQueue.pop();
+            nowValue = valueQueue.removeFirst();
+            return _currToken = tokenQueue.removeFirst();
         }
         return null;
     }
@@ -247,7 +261,11 @@ public class NbtParser extends ParserMinimalBase {
      */
     @Override
     public JsonLocation getTokenLocation() {
-        return null;
+        try {
+            return new JsonLocation(inputStream, _totalByte, 0, 1, _totalByte - dataInputStream.available());
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     /**

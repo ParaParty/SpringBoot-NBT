@@ -73,6 +73,16 @@ class TestController {
     }
 
     /**
+     * 序列化测试（用户表单）
+     */
+    @GetMapping("/simple/register")
+    @ResponseBody
+    fun simpleRegisterGenerate() = RegisterFormDto().apply {
+        username = "Eric"
+        email = "Test@ttt.me"
+    }
+
+    /**
      * 反序列化测试（用户表单）
      */
     @PostMapping("/simple/register", produces = ["text/plain"])
