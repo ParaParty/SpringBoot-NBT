@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.MapperBuilder;
 
 /**
- * {@link ObjectMapper} but only NBT supportted.
+ * {@link ObjectMapper} but only NBT supported.
  */
 public class NbtMapper extends ObjectMapper {
     public static class Builder extends MapperBuilder<NbtMapper, Builder>
