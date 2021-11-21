@@ -9,6 +9,12 @@ import com.fasterxml.jackson.core.json.PackageVersion;
 import java.io.*;
 import java.net.URL;
 
+/**
+ * NBT Factory.
+ *
+ * This class is an implementation of {@link com.fasterxml.jackson.core.JsonFactory}.
+ * The detailed information about this class is available in {@link com.fasterxml.jackson.core.JsonFactory}.
+ */
 public class NbtFactory extends JsonFactory {
     public NbtFactory() {
     }
@@ -63,7 +69,6 @@ public class NbtFactory extends JsonFactory {
         // TODO
         return MatchStrength.INCONCLUSIVE;
     }
-
 
     // Nbt is not positional
     @Override

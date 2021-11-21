@@ -16,6 +16,11 @@ import java.math.BigInteger;
 import java.util.ArrayDeque;
 import java.util.Stack;
 
+/**
+ * NBT Parser
+ *
+ * Parser a NBT data from NBT stream.
+ */
 public class NbtParser extends ParserMinimalBase {
     private final IOContext _ioContext;
     private ObjectCodec _objectCodec;

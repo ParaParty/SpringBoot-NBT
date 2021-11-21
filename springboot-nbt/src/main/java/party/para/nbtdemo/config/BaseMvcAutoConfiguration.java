@@ -8,6 +8,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.List;
 
+/**
+ * Spring Boot NBT support auto configuration.
+ */
 @Configuration
 @ConditionalOnClass({WebMvcConfigurer.class, HttpMessageConverter.class})
 public class BaseMvcAutoConfiguration implements WebMvcConfigurer, InitializingBean {

@@ -3,6 +3,9 @@ package party.para.jackson.nbt;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.MapperBuilder;
 
+/**
+ * {@link ObjectMapper} but only NBT supportted.
+ */
 public class NbtMapper extends ObjectMapper {
     public static class Builder extends MapperBuilder<NbtMapper, Builder>
     {
@@ -37,5 +40,4 @@ public class NbtMapper extends ObjectMapper {
     public NbtFactory getFactory() {
         return (NbtFactory) _jsonFactory;
     }
-
 }

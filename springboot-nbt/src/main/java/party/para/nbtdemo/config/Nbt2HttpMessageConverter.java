@@ -6,7 +6,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.AbstractJackson2HttpMessageConverter;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 
-
+/**
+ * Add NBT support to Spring Boot.
+ */
 public class Nbt2HttpMessageConverter extends AbstractJackson2HttpMessageConverter {
     /**
      * Construct a new {@link Nbt2HttpMessageConverter} using default configuration
