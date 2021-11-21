@@ -8,13 +8,22 @@ plugins {
     id 'maven-publish'
 }
 
+group = 'party.para'
+version = '1.0.0'
+
+allprojects {
+    group = project.group
+    version = project.version
+    sourceCompatibility = '1.8'
+}
+
 subprojects {
     tasks.withType(JavaCompile) {
         options.encoding = 'UTF-8'
     }
 }
 
-group 'com.superexercisebook'
+group 'para.party'
 version '1.0-SNAPSHOT'
 
 repositories {

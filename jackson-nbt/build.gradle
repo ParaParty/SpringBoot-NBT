@@ -1,9 +1,11 @@
 plugins {
     id 'java'
     id 'java-library'
+    id 'maven-publish'
+    id 'signing'
 }
 
-group = 'com.superexercisebook'
+group = 'party.para'
 version = '1.0.0'
 sourceCompatibility = '1.8'
 
@@ -20,4 +22,77 @@ dependencies {
 
 test {
     useJUnitPlatform()
+}
+
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+def selfProject = project
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId = selfProject.group
+            version = selfProject.version
+            artifactId = selfProject.name
+
+            from components.java
+            artifacts {
+                archives javadocJar, sourcesJar
+            }
+
+            versionMapping {
+                usage('java-api') {
+                    fromResolutionOf('runtimeClasspath')
+                }
+                usage('java-runtime') {
+                    fromResolutionResult()
+                }
+            }
+            pom {
+                name = 'Jackson NBT'
+                description = 'A NBT support for Jackson'
+                url = 'https://github.com/ParaParty/SpringBoot-NBT'
+//                properties = [                ]
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/licenses/MIT'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'ericlian'
+                        name = 'Eric_Lian'
+                        email = 'public@superexercisebook.com'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/ParaParty/SpringBoot-NBT.git'
+                    developerConnection = 'scm:git:https://github.com/ParaParty/SpringBoot-NBT.git'
+                    url = 'https://github.com/ParaParty/SpringBoot-NBT'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            def releasesRepoUrl = layout.buildDirectory.dir('repos/releases')
+            def snapshotsRepoUrl = layout.buildDirectory.dir('repos/snapshots')
+            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+        }
+    }
+}
+
+signing {
+    sign publishing.publications.mavenJava
+}
+
+javadoc {
+    if (JavaVersion.current().isJava9Compatible()) {
+        options.addBooleanOption('html5', true)
+    }
 }

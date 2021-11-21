@@ -5,12 +5,12 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'springboot-nbt'
+rootProject.name = 'jackson-and-spring-boot-nbt'
 
 def modules = [
     'jackson-nbt',
-    'springboot-nbt',
-    'springboot-demo',
+    'spring-boot-nbt',
+    'spring-boot-demo',
 ]
 
 for (item in modules) {
@@ -18,5 +18,8 @@ for (item in modules) {
 }
 
 for (item in modules) {
-    project(":$item").projectDir = "$rootDir/$item" as File
+    def project = project(":$item")
+
+    project.projectDir = "$rootDir/$item" as File
+    project.name = "$item"
 }
