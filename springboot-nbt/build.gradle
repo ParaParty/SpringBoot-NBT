@@ -1,0 +1,28 @@
+plugins {
+    id 'io.spring.dependency-management'
+    id 'java'
+    id 'java-library'
+}
+
+group = 'com.superexercisebook'
+version = '1.0.0'
+sourceCompatibility = '1.8'
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io/' }
+}
+
+dependencies {
+    implementation 'org.springframework:spring-beans:5.3.13'
+    implementation 'org.springframework:spring-webmvc:5.3.13'
+    implementation 'org.springframework:spring-context:5.3.13'
+    implementation 'org.springframework.boot:spring-boot-autoconfigure:2.6.0'
+
+
+    api project(path: ':jackson-nbt')
+}
+
+test {
+    useJUnitPlatform()
+}

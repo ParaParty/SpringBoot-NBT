@@ -1,1 +1,22 @@
-rootProject.name = 'nbt-demo'
+pluginManagement {
+    repositories {
+        mavenCentral()
+        maven { url 'https://plugins.gradle.org/m2/' }
+    }
+}
+
+rootProject.name = 'springboot-nbt'
+
+def modules = [
+    'jackson-nbt',
+    'springboot-nbt',
+    'springboot-demo',
+]
+
+for (item in modules) {
+    include ":$item"
+}
+
+for (item in modules) {
+    project(":$item").projectDir = "$rootDir/$item" as File
+}
