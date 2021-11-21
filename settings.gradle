@@ -18,8 +18,5 @@ for (item in modules) {
 }
 
 for (item in modules) {
-    def project = project(":$item")
-
-    project.projectDir = "$rootDir/$item" as File
-    project.name = "$item"
+    project(":$item").projectDir = "$rootDir/$item" as File
 }

@@ -1,10 +1,10 @@
 package party.para.nbtdemo.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import party.para.jackson.nbt.NbtMapper;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.AbstractJackson2HttpMessageConverter;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
+import party.para.jackson.nbt.NbtMapper;
 
 /**
  * Add NBT support to Spring Boot.

@@ -23,8 +23,6 @@ subprojects {
     }
 }
 
-group 'para.party'
-version '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
