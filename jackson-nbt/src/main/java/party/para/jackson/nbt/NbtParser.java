@@ -5,7 +5,8 @@ import com.fasterxml.jackson.core.base.ParserMinimalBase;
 import com.fasterxml.jackson.core.io.IOContext;
 import com.fasterxml.jackson.core.util.ByteArrayBuilder;
 import com.fasterxml.jackson.core.util.TextBuffer;
-import net.querz.nbt.tag.*;
+import net.kyori.adventure.nbt.BinaryTagType;
+import net.kyori.adventure.nbt.BinaryTagTypes;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -18,7 +19,7 @@ import java.util.Stack;
 
 /**
  * NBT Parser
- *
+ * <p>
  * Parser a NBT data from NBT stream.
  */
 public class NbtParser extends ParserMinimalBase {
@@ -42,42 +43,42 @@ public class NbtParser extends ParserMinimalBase {
         int nowIndex = 0;
         final byte containsType;
 
-        State(byte type) {
-            this.type = type;
+        State(BinaryTagType<?> type) {
+            this.type = type.id();
             this.length = 0;
             this.containsType = (byte) 0;
         }
 
-        State(byte type, int length) {
-            this.type = type;
+        State(BinaryTagType<?> type, int length) {
+            this.type = type.id();
             this.length = length;
             this.containsType = (byte) 0;
         }
 
-        State(byte type, int length, byte containsType) {
-            this.type = type;
+        State(BinaryTagType<?> type, int length, byte containsType) {
+            this.type = type.id();
             this.length = length;
             this.containsType = containsType;
         }
 
         static State MAP() {
-            return new State(CompoundTag.ID);
+            return new State(BinaryTagTypes.COMPOUND);
         }
 
         static State LIST(int length, byte containsType) {
-            return new State(ListTag.ID, length, containsType);
+            return new State(BinaryTagTypes.LIST, length, containsType);
         }
 
         static State LIST_BYTE(int length) {
-            return new State(ByteArrayTag.ID, length);
+            return new State(BinaryTagTypes.BYTE_ARRAY, length);
         }
 
         static State LIST_INT(int length) {
-            return new State(IntArrayTag.ID, length);
+            return new State(BinaryTagTypes.INT_ARRAY, length);
         }
 
         static State LONG_ARRAY(int length) {
-            return new State(LongArrayTag.ID, length);
+            return new State(BinaryTagTypes.LONG_ARRAY, length);
         }
     }
 
@@ -111,20 +112,20 @@ public class NbtParser extends ParserMinimalBase {
         _totalByte = end - start;
 
 
-        if (inputBuffer[0] == CompoundTag.ID) {
+        if (inputBuffer[0] == BinaryTagTypes.COMPOUND.id()) {
             dataInputStream.readByte(); // 读掉 0x0A
             String key = dataInputStream.readUTF();  // 读掉第一层键-
 
             tokenQueue.addLast(JsonToken.START_OBJECT);
             valueQueue.addLast(key);
             pushState(State.MAP());
-        } else if (inputBuffer[0] == ListTag.ID) {
+        } else if (inputBuffer[0] == BinaryTagTypes.LIST.id()) {
             byte containsType = dataInputStream.readByte();
             int length = dataInputStream.readInt();
             tokenQueue.addLast(JsonToken.START_ARRAY);
             valueQueue.addLast("[");
             pushState(State.LIST(length, containsType));
-        } else if (inputBuffer[0] == ByteArrayTag.ID) {
+        } else if (inputBuffer[0] == BinaryTagTypes.BYTE_ARRAY.id()) {
             dataInputStream.readByte();
             int length = dataInputStream.readInt();
 
@@ -135,7 +136,7 @@ public class NbtParser extends ParserMinimalBase {
 
 //            tokenQueue.addLast(JsonToken.START_ARRAY);
 //            pushState(State.LIST_BYTE);
-        } else if (inputBuffer[0] == IntArrayTag.ID) {
+        } else if (inputBuffer[0] == BinaryTagTypes.INT_ARRAY.id()) {
             dataInputStream.readByte();
             int length = dataInputStream.readInt();
 
@@ -146,7 +147,7 @@ public class NbtParser extends ParserMinimalBase {
 
 //            tokenQueue.addLast(JsonToken.START_ARRAY);
 //            pushState(State.LIST_INT);
-        } else if (inputBuffer[0] == LongArrayTag.ID) {
+        } else if (inputBuffer[0] == BinaryTagTypes.LONG_ARRAY.id()) {
             dataInputStream.readByte();
             int length = dataInputStream.readInt();
 
@@ -185,262 +186,239 @@ public class NbtParser extends ParserMinimalBase {
             throw new EOFException();
         }
 
-        if (topState().type == CompoundTag.ID) {
+        if (topState().type == BinaryTagTypes.COMPOUND.id()) {
             byte type = dataInputStream.readByte();
-            if (type == EndTag.ID) {
+            if (type == BinaryTagTypes.END.id()) {
                 popState();
                 tokenQueue.addLast(JsonToken.END_OBJECT);
                 valueQueue.addLast("}");
             } else {
-
                 String key = dataInputStream.readUTF();
                 tokenQueue.addLast(JsonToken.FIELD_NAME);
                 valueQueue.addLast(key);
 
-                switch (type) {
-                    case ByteTag.ID:
-                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
-                        valueQueue.addLast(dataInputStream.readByte());
-                        break;
-                    case ShortTag.ID:
-                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
-                        valueQueue.addLast(dataInputStream.readShort());
-                        break;
-                    case IntTag.ID:
-                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
-                        valueQueue.addLast(dataInputStream.readInt());
-                        break;
-                    case LongTag.ID:
-                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
-                        valueQueue.addLast(dataInputStream.readLong());
-                        break;
-                    case FloatTag.ID:
-                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_FLOAT);
-                        valueQueue.addLast(dataInputStream.readFloat());
-                        break;
-                    case DoubleTag.ID:
-                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_FLOAT);
-                        valueQueue.addLast(dataInputStream.readDouble());
-                        break;
-                    case ByteArrayTag.ID: {
-                        int length = dataInputStream.readInt();
-                        tokenQueue.add(JsonToken.START_ARRAY);
-                        valueQueue.add("[");
-                        for (int i = 0; i < length; i++) {
-                            tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
-                            valueQueue.add(dataInputStream.readByte());
-                        }
-                        tokenQueue.add(JsonToken.END_ARRAY);
-                        valueQueue.add("]");
+                if (type == BinaryTagTypes.BYTE.id()) {
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.addLast(dataInputStream.readByte());
+                } else if (type == BinaryTagTypes.SHORT.id()) {
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.addLast(dataInputStream.readShort());
+                } else if (type == BinaryTagTypes.INT.id()) {
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.addLast(dataInputStream.readInt());
+                } else if (type == BinaryTagTypes.LONG.id()) {
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.addLast(dataInputStream.readLong());
+                } else if (type == BinaryTagTypes.FLOAT.id()) {
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_FLOAT);
+                    valueQueue.addLast(dataInputStream.readFloat());
+                } else if (type == BinaryTagTypes.DOUBLE.id()) {
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_FLOAT);
+                    valueQueue.addLast(dataInputStream.readDouble());
+                } else if (type == BinaryTagTypes.BYTE_ARRAY.id()) {
+                    int length = dataInputStream.readInt();
+                    tokenQueue.add(JsonToken.START_ARRAY);
+                    valueQueue.add("[");
+                    for (int i = 0; i < length; i++) {
+                        tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
+                        valueQueue.add(dataInputStream.readByte());
                     }
-                    break;
-                    case StringTag.ID:
-                        tokenQueue.addLast(JsonToken.VALUE_STRING);
-                        valueQueue.addLast(dataInputStream.readUTF());
-                        break;
-                    case ListTag.ID: {
-                        byte containsType = dataInputStream.readByte();
-                        int length = dataInputStream.readInt();
-                        tokenQueue.addLast(JsonToken.START_ARRAY);
-                        valueQueue.addLast("[");
-                        pushState(State.LIST(length, containsType));
-                        break;
+                    tokenQueue.add(JsonToken.END_ARRAY);
+                    valueQueue.add("]");
+                } else if (type == BinaryTagTypes.STRING.id()) {
+                    tokenQueue.addLast(JsonToken.VALUE_STRING);
+                    valueQueue.addLast(dataInputStream.readUTF());
+                } else if (type == BinaryTagTypes.LIST.id()) {
+                    byte containsType = dataInputStream.readByte();
+                    int length = dataInputStream.readInt();
+                    tokenQueue.addLast(JsonToken.START_ARRAY);
+                    valueQueue.addLast("[");
+                    pushState(State.LIST(length, containsType));
+                } else if (type == BinaryTagTypes.COMPOUND.id()) {
+                    pushState(State.MAP());
+                } else if (type == BinaryTagTypes.INT_ARRAY.id()) {
+                    int length = dataInputStream.readInt();
+                    tokenQueue.add(JsonToken.START_ARRAY);
+                    valueQueue.add("[");
+                    for (int i = 0; i < length; i++) {
+                        tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
+                        valueQueue.add(dataInputStream.readInt());
                     }
-                    case CompoundTag.ID:
-                        pushState(State.MAP());
-                        break;
-                    case IntArrayTag.ID: {
-                        int length = dataInputStream.readInt();
-                        tokenQueue.add(JsonToken.START_ARRAY);
-                        valueQueue.add("[");
-                        for (int i = 0; i < length; i++) {
-                            tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
-                            valueQueue.add(dataInputStream.readInt());
-                        }
-                        tokenQueue.add(JsonToken.END_ARRAY);
-                        valueQueue.add("]");
+                    tokenQueue.add(JsonToken.END_ARRAY);
+                    valueQueue.add("]");
+                } else if (type == BinaryTagTypes.LONG_ARRAY.id()) {
+                    int length = dataInputStream.readInt();
+                    tokenQueue.add(JsonToken.START_ARRAY);
+                    valueQueue.add("[");
+                    for (int i = 0; i < length; i++) {
+                        tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
+                        valueQueue.add(dataInputStream.readLong());
                     }
-                    break;
-                    case LongArrayTag.ID: {
-                        int length = dataInputStream.readInt();
-                        tokenQueue.add(JsonToken.START_ARRAY);
-                        valueQueue.add("[");
-                        for (int i = 0; i < length; i++) {
-                            tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
-                            valueQueue.add(dataInputStream.readLong());
-                        }
-                        tokenQueue.add(JsonToken.END_ARRAY);
-                        valueQueue.add("]");
-                    }
-                    break;
-                    default:
-                        _reportError("Invalid Type ID");
+                    tokenQueue.add(JsonToken.END_ARRAY);
+                    valueQueue.add("]");
+                } else {
+                    _reportError("Invalid Type ID");
                 }
             }
-        } else if (topState().type == ListTag.ID) {
+        } else if (topState().type == BinaryTagTypes.LIST.id()) {
             State nowState = topState();
             byte nowContainsType = nowState.containsType;
             int nowLength = nowState.length;
 
-            switch (nowContainsType) {
-                case EndTag.ID:
-                    tokenQueue.addLast(JsonToken.END_ARRAY);
-                    valueQueue.addLast("]");
-                    popState();
-                    break;
-                case ByteTag.ID:
-                    for (int i = 0; i < nowLength; i++) {
-                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
-                        valueQueue.addLast(dataInputStream.readByte());
-                    }
-                    tokenQueue.addLast(JsonToken.END_ARRAY);
-                    valueQueue.addLast("]");
-                    popState();
-                    break;
-                case ShortTag.ID:
-                    for (int i = 0; i < nowLength; i++) {
-                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
-                        valueQueue.addLast(dataInputStream.readShort());
-                    }
-                    tokenQueue.addLast(JsonToken.END_ARRAY);
-                    valueQueue.addLast("]");
-                    popState();
-                    break;
-                case IntTag.ID:
-                    for (int i = 0; i < nowLength; i++) {
-                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
-                        valueQueue.addLast(dataInputStream.readInt());
-                    }
-                    tokenQueue.addLast(JsonToken.END_ARRAY);
-                    valueQueue.addLast("]");
-                    popState();
-                    break;
-                case LongTag.ID:
-                    for (int i = 0; i < nowLength; i++) {
-                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
-                        valueQueue.addLast(dataInputStream.readLong());
-                    }
-                    tokenQueue.addLast(JsonToken.END_ARRAY);
-                    valueQueue.addLast("]");
-                    popState();
-                    break;
-                case FloatTag.ID:
-                    for (int i = 0; i < nowLength; i++) {
-                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_FLOAT);
-                        valueQueue.addLast(dataInputStream.readFloat());
-                    }
-                    tokenQueue.addLast(JsonToken.END_ARRAY);
-                    valueQueue.addLast("]");
-                    popState();
-                    break;
-                case DoubleTag.ID:
-                    for (int i = 0; i < nowLength; i++) {
-                        tokenQueue.addLast(JsonToken.VALUE_NUMBER_FLOAT);
-                        valueQueue.addLast(dataInputStream.readDouble());
-                    }
-                    tokenQueue.addLast(JsonToken.END_ARRAY);
-                    valueQueue.addLast("]");
-                    popState();
-                    break;
-                case ByteArrayTag.ID: {
-                    if (nowState.nowIndex < nowState.length) {
-                        nowState.nowIndex++;
-
-                        int length = dataInputStream.readInt();
-                        tokenQueue.add(JsonToken.START_ARRAY);
-                        valueQueue.add("[");
-                        for (int i = 0; i < length; i++) {
-                            tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
-                            valueQueue.add(dataInputStream.readByte());
-                        }
-                        tokenQueue.add(JsonToken.END_ARRAY);
-                        valueQueue.add("]");
-                    } else {
-                        tokenQueue.addLast(JsonToken.END_ARRAY);
-                        valueQueue.addLast("]");
-                        popState();
-                    }
+            if (nowContainsType == BinaryTagTypes.END.id()) {
+                tokenQueue.addLast(JsonToken.END_ARRAY);
+                valueQueue.addLast("]");
+                popState();
+            } else if (nowContainsType == BinaryTagTypes.BYTE.id()) {
+                for (int i = 0; i < nowLength; i++) {
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.addLast(dataInputStream.readByte());
                 }
-                break;
-                case StringTag.ID:
-                    for (int i = 0; i < nowLength; i++) {
-                        tokenQueue.addLast(JsonToken.VALUE_STRING);
-                        valueQueue.addLast(dataInputStream.readUTF());
+                tokenQueue.addLast(JsonToken.END_ARRAY);
+                valueQueue.addLast("]");
+                popState();
+            } else if (nowContainsType == BinaryTagTypes.SHORT.id()) {
+                for (int i = 0; i < nowLength; i++) {
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.addLast(dataInputStream.readShort());
+                }
+                tokenQueue.addLast(JsonToken.END_ARRAY);
+                valueQueue.addLast("]");
+                popState();
+            } else if (nowContainsType == BinaryTagTypes.INT.id()) {
+                for (int i = 0; i < nowLength; i++) {
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.addLast(dataInputStream.readInt());
+                }
+                tokenQueue.addLast(JsonToken.END_ARRAY);
+                valueQueue.addLast("]");
+                popState();
+            } else if (nowContainsType == BinaryTagTypes.LONG.id()) {
+                for (int i = 0; i < nowLength; i++) {
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_INT);
+                    valueQueue.addLast(dataInputStream.readLong());
+                }
+                tokenQueue.addLast(JsonToken.END_ARRAY);
+                valueQueue.addLast("]");
+                popState();
+            } else if (nowContainsType == BinaryTagTypes.FLOAT.id()) {
+                for (int i = 0; i < nowLength; i++) {
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_FLOAT);
+                    valueQueue.addLast(dataInputStream.readFloat());
+                }
+                tokenQueue.addLast(JsonToken.END_ARRAY);
+                valueQueue.addLast("]");
+                popState();
+            } else if (nowContainsType == BinaryTagTypes.DOUBLE.id()) {
+                for (int i = 0; i < nowLength; i++) {
+                    tokenQueue.addLast(JsonToken.VALUE_NUMBER_FLOAT);
+                    valueQueue.addLast(dataInputStream.readDouble());
+                }
+                tokenQueue.addLast(JsonToken.END_ARRAY);
+                valueQueue.addLast("]");
+                popState();
+            } else if (nowContainsType == BinaryTagTypes.BYTE_ARRAY.id()) {
+                if (nowState.nowIndex < nowState.length) {
+                    nowState.nowIndex++;
+
+                    int length = dataInputStream.readInt();
+                    tokenQueue.add(JsonToken.START_ARRAY);
+                    valueQueue.add("[");
+                    for (int i = 0; i < length; i++) {
+                        tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
+                        valueQueue.add(dataInputStream.readByte());
                     }
+                    tokenQueue.add(JsonToken.END_ARRAY);
+                    valueQueue.add("]");
+                } else {
                     tokenQueue.addLast(JsonToken.END_ARRAY);
                     valueQueue.addLast("]");
                     popState();
-                    break;
-                case ListTag.ID: {
-                    if (nowState.nowIndex < nowState.length) {
-                        nowState.nowIndex++;
-
-                        byte containsType = dataInputStream.readByte();
-                        int length = dataInputStream.readInt();
-                        tokenQueue.addLast(JsonToken.START_ARRAY);
-                        valueQueue.addLast("[");
-                        pushState(State.LIST(length, containsType));
-                    } else {
-                        tokenQueue.addLast(JsonToken.END_ARRAY);
-                        valueQueue.addLast("]");
-                        popState();
-                    }
                 }
-                case CompoundTag.ID:
-                    if (nowState.nowIndex < nowState.length) {
-                        nowState.nowIndex++;
-
-                        tokenQueue.addLast(JsonToken.START_OBJECT);
-                        valueQueue.addLast("{");
-                        pushState(State.MAP());
-                    } else {
-                        tokenQueue.addLast(JsonToken.END_ARRAY);
-                        valueQueue.addLast("]");
-                        popState();
-                    }
-                    break;
-                case IntArrayTag.ID: {
-                    if (nowState.nowIndex < nowState.length) {
-                        nowState.nowIndex++;
-
-                        int length = dataInputStream.readInt();
-                        tokenQueue.add(JsonToken.START_ARRAY);
-                        valueQueue.add("[");
-                        for (int i = 0; i < length; i++) {
-                            tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
-                            valueQueue.add(dataInputStream.readInt());
-                        }
-                        tokenQueue.add(JsonToken.END_ARRAY);
-                        valueQueue.add("]");
-                    } else {
-                        tokenQueue.addLast(JsonToken.END_ARRAY);
-                        valueQueue.addLast("]");
-                        popState();
-                    }
+            } else if (nowContainsType == BinaryTagTypes.STRING.id()) {
+                for (int i = 0; i < nowLength; i++) {
+                    tokenQueue.addLast(JsonToken.VALUE_STRING);
+                    valueQueue.addLast(dataInputStream.readUTF());
                 }
-                break;
-                case LongArrayTag.ID: {
-                    if (nowState.nowIndex < nowState.length) {
-                        nowState.nowIndex++;
+                tokenQueue.addLast(JsonToken.END_ARRAY);
+                valueQueue.addLast("]");
+                popState();
+            } else if (nowContainsType == BinaryTagTypes.LIST.id()) {
+                if (nowState.nowIndex < nowState.length) {
+                    nowState.nowIndex++;
 
-                        int length = dataInputStream.readInt();
-                        tokenQueue.add(JsonToken.START_ARRAY);
-                        valueQueue.add("[");
-                        for (int i = 0; i < length; i++) {
-                            tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
-                            valueQueue.add(dataInputStream.readLong());
-                        }
-                        tokenQueue.add(JsonToken.END_ARRAY);
-                        valueQueue.add("]");
-                    } else {
-                        tokenQueue.addLast(JsonToken.END_ARRAY);
-                        valueQueue.addLast("]");
-                        popState();
-                    }
+                    byte containsType = dataInputStream.readByte();
+                    int length = dataInputStream.readInt();
+                    tokenQueue.addLast(JsonToken.START_ARRAY);
+                    valueQueue.addLast("[");
+                    pushState(State.LIST(length, containsType));
+                } else {
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    popState();
                 }
-                break;
-                default:
-                    _reportError("Invalid Type ID");
+
+                if (nowState.nowIndex < nowState.length) {
+                    nowState.nowIndex++;
+
+                    tokenQueue.addLast(JsonToken.START_OBJECT);
+                    valueQueue.addLast("{");
+                    pushState(State.MAP());
+                } else {
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    popState();
+                }
+            } else if (nowContainsType == BinaryTagTypes.COMPOUND.id()) {
+                if (nowState.nowIndex < nowState.length) {
+                    nowState.nowIndex++;
+
+                    tokenQueue.addLast(JsonToken.START_OBJECT);
+                    valueQueue.addLast("{");
+                    pushState(State.MAP());
+                } else {
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    popState();
+                }
+            } else if (nowContainsType == BinaryTagTypes.INT_ARRAY.id()) {
+                if (nowState.nowIndex < nowState.length) {
+                    nowState.nowIndex++;
+
+                    int length = dataInputStream.readInt();
+                    tokenQueue.add(JsonToken.START_ARRAY);
+                    valueQueue.add("[");
+                    for (int i = 0; i < length; i++) {
+                        tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
+                        valueQueue.add(dataInputStream.readInt());
+                    }
+                    tokenQueue.add(JsonToken.END_ARRAY);
+                    valueQueue.add("]");
+                } else {
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    popState();
+                }
+            } else if (nowContainsType == BinaryTagTypes.LONG_ARRAY.id()) {
+                if (nowState.nowIndex < nowState.length) {
+                    nowState.nowIndex++;
+
+                    int length = dataInputStream.readInt();
+                    tokenQueue.add(JsonToken.START_ARRAY);
+                    valueQueue.add("[");
+                    for (int i = 0; i < length; i++) {
+                        tokenQueue.add(JsonToken.VALUE_NUMBER_INT);
+                        valueQueue.add(dataInputStream.readLong());
+                    }
+                    tokenQueue.add(JsonToken.END_ARRAY);
+                    valueQueue.add("]");
+                } else {
+                    tokenQueue.addLast(JsonToken.END_ARRAY);
+                    valueQueue.addLast("]");
+                    popState();
+                }
+            } else {
+                _reportError("Invalid Type ID");
             }
 
         }

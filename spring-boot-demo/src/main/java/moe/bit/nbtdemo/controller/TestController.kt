@@ -1,12 +1,12 @@
 package moe.bit.nbtdemo.controller
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import party.para.jackson.nbt.NbtMapper
 import moe.bit.nbtdemo.domain.dto.RegisterFormDto
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.springframework.stereotype.Controller
 import org.springframework.web.bind.annotation.*
+import party.para.jackson.nbt.NbtMapper
 import java.io.ByteArrayInputStream
 import java.util.*
 
@@ -38,7 +38,15 @@ class TestController {
             "nestedObject" to mapOf(
                 "username" to "Eric_Lian",
                 "email" to "public@superexercisebook.com"
-            )
+            ),
+            "list" to Array<Int>(rand.nextInt(5) + 2) { _ -> rand.nextInt() },
+            "listOfObject" to Array<Map<String, Any>>(rand.nextInt(5) + 2) { _ ->
+                mapOf(
+                    "key" to "value",
+                    "key2" to "value2"
+                )
+            },
+            "listOfList" to Array<Array<Int>>(rand.nextInt(5) + 2) { _ -> Array<Int>(rand.nextInt(5) + 2) { _ -> rand.nextInt() } },
         )
 
     /**
@@ -54,7 +62,7 @@ class TestController {
      */
     @GetMapping("/simple/longList")
     @ResponseBody
-    fun simpleLongList() = (0..rand.nextInt(1000)).map{ rand.nextInt() }
+    fun simpleLongList() = (0..rand.nextInt(1000)).map { rand.nextInt() }
 
     var client: OkHttpClient = OkHttpClient()
 
@@ -64,13 +72,14 @@ class TestController {
     @GetMapping("/simple/complexObject")
     @ResponseBody
     fun simpleComplexObject(): Any {
-        val request: Request = Request.Builder().url("https://reciter.binkic.com/comprehensions/comprehensions.json").build();
-        val result = client.newCall(request).execute().use {
-                response -> response.body()?.string()
+        val request: Request =
+            Request.Builder().url("https://reciter.binkic.com/comprehensions/comprehensions.json").build();
+        val result = client.newCall(request).execute().use { response ->
+            response.body()?.string()
         }
 
         val mapper = ObjectMapper()
-        return mapper.readTree(result);
+        return mapper.readTree(result)
     }
 
     /**
@@ -88,7 +97,7 @@ class TestController {
      */
     @PostMapping("/simple/register", produces = ["text/plain"])
     @ResponseBody
-    fun simpleRegister(@RequestBody t : RegisterFormDto): Any {
+    fun simpleRegister(@RequestBody t: RegisterFormDto): Any {
         return "${t.username}\n${t.email}"
     }
 
@@ -97,7 +106,7 @@ class TestController {
      */
     @PostMapping("/simple/testParse", produces = ["application/json"])
     @ResponseBody
-    fun simpleParse(@RequestBody t : ByteArray): Any {
+    fun simpleParse(@RequestBody t: ByteArray): Any {
         // 以 json 形式输出到页面上
         val mapper = NbtMapper()
         return mapper.readTree(ByteArrayInputStream(t));
