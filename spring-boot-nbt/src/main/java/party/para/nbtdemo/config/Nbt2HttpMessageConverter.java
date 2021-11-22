@@ -22,6 +22,7 @@ public class Nbt2HttpMessageConverter extends AbstractJackson2HttpMessageConvert
      * Construct a new {@link Nbt2HttpMessageConverter} with a custom {@link ObjectMapper}.
      * You can use {@link Jackson2ObjectMapperBuilder} to build it easily.
      *
+     * @param objectMapper An object mapper for this Converter.
      * @see Jackson2ObjectMapperBuilder#json()
      */
     public Nbt2HttpMessageConverter(ObjectMapper objectMapper) {

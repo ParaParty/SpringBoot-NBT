@@ -31,11 +31,11 @@ public class NbtParser extends ParserMinimalBase {
     private final DataInputStream dataInputStream;
     private final int _totalByte;
 
-    private ArrayDeque<JsonToken> tokenQueue = new ArrayDeque<JsonToken>();
-    private ArrayDeque<Object> valueQueue = new ArrayDeque<Object>();
+    private final ArrayDeque<JsonToken> tokenQueue = new ArrayDeque<JsonToken>();
+    private final ArrayDeque<Object> valueQueue = new ArrayDeque<Object>();
     private Object nowValue = null;
 
-    private Stack<State> stateStack = new Stack<State>();
+    private final Stack<State> stateStack = new Stack<State>();
 
     static class State {
         final byte type;
@@ -430,9 +430,6 @@ public class NbtParser extends ParserMinimalBase {
         return null;
     }
 
-    /**
-     * Method sub-classes need to implement
-     */
     @Override
     protected void _handleEOF() throws JsonParseException {
 
@@ -446,32 +443,16 @@ public class NbtParser extends ParserMinimalBase {
         throw new IOException("");
     }
 
-    /**
-     * Accessor for {@link ObjectCodec} associated with this
-     * parser, if any. Codec is used by {@link #readValueAs(Class)}
-     * method (and its variants).
-     */
     @Override
     public ObjectCodec getCodec() {
         return _objectCodec;
     }
 
-    /**
-     * Setter that allows defining {@link ObjectCodec} associated with this
-     * parser, if any. Codec is used by {@link #readValueAs(Class)}
-     * method (and its variants).
-     *
-     * @param c
-     */
     @Override
     public void setCodec(ObjectCodec c) {
         _objectCodec = c;
     }
 
-    /**
-     * Accessor for getting version of the core package, given a parser instance.
-     * Left for sub-classes to implement.
-     */
     @Override
     public Version version() {
         return new Version(1, 0, 0, "", "", "");
@@ -492,11 +473,6 @@ public class NbtParser extends ParserMinimalBase {
         return null;
     }
 
-    /**
-     * Method that return the <b>starting</b> location of the current
-     * token; that is, position of the first character from input
-     * that starts the current token.
-     */
     @Override
     public JsonLocation getTokenLocation() {
         try {
@@ -506,10 +482,6 @@ public class NbtParser extends ParserMinimalBase {
         }
     }
 
-    /**
-     * Method that returns location of the last processed character;
-     * usually for error reporting purposes.
-     */
     @Override
     public JsonLocation getCurrentLocation() {
         return null;
@@ -541,12 +513,6 @@ public class NbtParser extends ParserMinimalBase {
         return nowValue instanceof String;
     }
 
-    /**
-     * Generic number value accessor method that will work for
-     * all kinds of numeric values. It will return the optimal
-     * (simplest/smallest possible) wrapper object that can
-     * express the numeric value just parsed.
-     */
     @Override
     public Number getNumberValue() throws IOException {
         if (nowValue instanceof Number) {
@@ -555,12 +521,6 @@ public class NbtParser extends ParserMinimalBase {
         throw new IOException("");
     }
 
-    /**
-     * If current token is of type
-     * {@link JsonToken#VALUE_NUMBER_INT} or
-     * {@link JsonToken#VALUE_NUMBER_FLOAT}, returns
-     * one of {@link NumberType} constants; otherwise returns null.
-     */
     @Override
     public NumberType getNumberType() throws IOException {
         if (nowValue instanceof Double) {
@@ -581,19 +541,6 @@ public class NbtParser extends ParserMinimalBase {
         return null;
     }
 
-    /**
-     * Numeric accessor that can be called when the current
-     * token is of type {@link JsonToken#VALUE_NUMBER_INT} and
-     * it can be expressed as a value of Java int primitive type.
-     * It can also be called for {@link JsonToken#VALUE_NUMBER_FLOAT};
-     * if so, it is equivalent to calling {@link #getDoubleValue}
-     * and then casting; except for possible overflow/underflow
-     * exception.
-     * <p>
-     * Note: if the resulting integer value falls outside range of
-     * Java int, a {@link JsonParseException}
-     * may be thrown to indicate numeric overflow/underflow.
-     */
     @Override
     public int getIntValue() throws IOException {
         if (nowValue instanceof Byte || nowValue instanceof Short || nowValue instanceof Integer) {
@@ -602,19 +549,6 @@ public class NbtParser extends ParserMinimalBase {
         throw new IOException("");
     }
 
-    /**
-     * Numeric accessor that can be called when the current
-     * token is of type {@link JsonToken#VALUE_NUMBER_INT} and
-     * it can be expressed as a Java long primitive type.
-     * It can also be called for {@link JsonToken#VALUE_NUMBER_FLOAT};
-     * if so, it is equivalent to calling {@link #getDoubleValue}
-     * and then casting to int; except for possible overflow/underflow
-     * exception.
-     * <p>
-     * Note: if the token is an integer, but its value falls
-     * outside of range of Java long, a {@link JsonParseException}
-     * may be thrown to indicate numeric overflow/underflow.
-     */
     @Override
     public long getLongValue() throws IOException {
         if (nowValue instanceof Byte || nowValue instanceof Short || nowValue instanceof Integer || nowValue instanceof Long) {
@@ -623,15 +557,6 @@ public class NbtParser extends ParserMinimalBase {
         throw new IOException("");
     }
 
-    /**
-     * Numeric accessor that can be called when the current
-     * token is of type {@link JsonToken#VALUE_NUMBER_INT} and
-     * it can not be used as a Java long primitive type due to its
-     * magnitude.
-     * It can also be called for {@link JsonToken#VALUE_NUMBER_FLOAT};
-     * if so, it is equivalent to calling {@link #getDecimalValue}
-     * and then constructing a {@link BigInteger} from that value.
-     */
     @Override
     public BigInteger getBigIntegerValue() throws IOException {
         if (nowValue instanceof Number) {
@@ -640,19 +565,6 @@ public class NbtParser extends ParserMinimalBase {
         throw new IOException("");
     }
 
-    /**
-     * Numeric accessor that can be called when the current
-     * token is of type {@link JsonToken#VALUE_NUMBER_FLOAT} and
-     * it can be expressed as a Java float primitive type.
-     * It can also be called for {@link JsonToken#VALUE_NUMBER_INT};
-     * if so, it is equivalent to calling {@link #getLongValue}
-     * and then casting; except for possible overflow/underflow
-     * exception.
-     * <p>
-     * Note: if the value falls
-     * outside of range of Java float, a {@link JsonParseException}
-     * will be thrown to indicate numeric overflow/underflow.
-     */
     @Override
     public float getFloatValue() throws IOException {
         if (nowValue instanceof Float) {
@@ -661,19 +573,6 @@ public class NbtParser extends ParserMinimalBase {
         throw new IOException("");
     }
 
-    /**
-     * Numeric accessor that can be called when the current
-     * token is of type {@link JsonToken#VALUE_NUMBER_FLOAT} and
-     * it can be expressed as a Java double primitive type.
-     * It can also be called for {@link JsonToken#VALUE_NUMBER_INT};
-     * if so, it is equivalent to calling {@link #getLongValue}
-     * and then casting; except for possible overflow/underflow
-     * exception.
-     * <p>
-     * Note: if the value falls
-     * outside of range of Java double, a {@link JsonParseException}
-     * will be thrown to indicate numeric overflow/underflow.
-     */
     @Override
     public double getDoubleValue() throws IOException {
         if (nowValue instanceof Double) {
@@ -682,12 +581,6 @@ public class NbtParser extends ParserMinimalBase {
         throw new IOException("");
     }
 
-    /**
-     * Numeric accessor that can be called when the current
-     * token is of type {@link JsonToken#VALUE_NUMBER_FLOAT} or
-     * {@link JsonToken#VALUE_NUMBER_INT}. No under/overflow exceptions
-     * are ever thrown.
-     */
     @Override
     public BigDecimal getDecimalValue() throws IOException {
         if (nowValue instanceof Number) {
